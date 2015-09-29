@@ -1,0 +1,28 @@
+
+Программа основана на разработке https://github.com/ircop/nfq_filter.
+
+Программа компилируется и работает под CentOS 7. Для сборки программы необходимы следующие библиотеки:
+
+ libnetfilter_queue
+ libnfnetlink
+ Poco >= 1.6
+ nDPI = 1.7
+
+Для запуска программы необходимо указать путь к конфигурационному .ini файлу (-c в командой строке). Для запуска в режиме daemon необходимо указать ключи --daemon и --pidfile=/path/to/file.pid
+
+
+
+Для перенаправления трафика на фильтр необходимо использовать следующую конструкцию iptables:
+
+ iptables -t mangle -A PREROUTING -s x.x.x.x/y -p tcp -m tcp -j NFQUEUE --queue-num 0 --queue-bypass
+
+где, x.x.x.x/y сеть, которую необходимо проверять.
+
+Для блокировки SSL/ip:port трафика необходимо использовать следующее правило:
+
+ iptables -A FORWARD -m mark --mark 17 -p tcp -j REJECT --reject-with tcp-reset
+
+ где 17, это значение из конфика nfqfilter.
+
+
+В каталоге contrib находятся примеры файлов для работы фильтра.

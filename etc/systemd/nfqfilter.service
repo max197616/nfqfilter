@@ -1,0 +1,12 @@
+[Unit]
+Description=Nfqilter filtering daemon
+Requires=network.target
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/nfqfilter --daemon --pidfile=/var/run/nfqfilter.pid -c /usr/local/etc/nfqfilter.ini
+PIDFile=/var/run/nfqfilter.pid
+
+[Install]
+WantedBy=multi-user.target
