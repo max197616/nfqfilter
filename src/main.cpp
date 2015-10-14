@@ -46,8 +46,9 @@ AhoCorasickPlus *nfqFilter::atm=NULL;
 AhoCorasickPlus *nfqFilter::atm_ssl=NULL;
 
 
-nfqFilter::nfqFilter(): _helpRequested(false),_queueNumber(0),_bufferSize(8388608)
+nfqFilter::nfqFilter(): _helpRequested(false),_queueNumber(0),_errorHandler(*this)
 {
+	Poco::ErrorHandler::set(&_errorHandler);
 }
 
 nfqFilter::~nfqFilter()
@@ -61,7 +62,6 @@ void nfqFilter::initialize(Application& self)
 	_queueNumber=config().getInt("queue",0);
 	_domainsFile=config().getString("domainlist","");
 	_urlsFile=config().getString("urllist","");
-	_bufferSize=config().getInt("buffer_size",8388608);
 	_redirectUrl=config().getString("redirect_url","");
 	_protocolsFile=config().getString("protocols","");
 
