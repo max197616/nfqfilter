@@ -4,7 +4,9 @@
 AC_PREREQ([2.69])
 AC_INIT(nfqfilter, 0.1, max1976@mail.ru)
 
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE()
+
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)])
 
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([include/config.h])
