@@ -118,6 +118,7 @@ private:
 	int _statistic_interval;
 	int _max_pending_packets;
 	int _mark_value;
+	bool _send_rst;
 	ErrorHandler _errorHandler;
 };
 

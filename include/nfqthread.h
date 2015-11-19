@@ -34,12 +34,13 @@ struct threadStats
 	u_int64_t redirected_domains;
 	u_int64_t redirected_urls;
 	u_int64_t marked_hosts;
+	u_int64_t sended_rst;
 };
 
 class nfqThread: public Poco::Task
 {
 public:
-	nfqThread(int queueNumber,int max_pending_packets,int mark_value);
+	nfqThread(int queueNumber, int max_pending_packets, int mark_value, bool send_rst);
 	virtual void runTask();
 	static int nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 	void getStats(threadStats &);
@@ -50,6 +51,7 @@ private:
 	struct nfq_q_handle *qh;
 	int _queue_maxlen;
 	int _mark_value;
+	bool _send_rst;
 
 	struct threadStats _stats;
 	Poco::Mutex _statsMutex;

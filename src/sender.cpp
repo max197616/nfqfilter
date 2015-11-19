@@ -95,13 +95,20 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 	tcph->source = htons(port_from);
 	tcph->dest = htons(port_to);
 	tcph->seq = acknum;
-	tcph->ack_seq = seqnum;
 	tcph->doff = 5;
-	tcph->fin = 1;				// !!
 	tcph->syn = 0;
 	tcph->rst = f_reset;
 	tcph->psh = f_psh;
-	tcph->ack = 1;
+	if(f_reset)
+	{
+		tcph->ack = 0;
+		tcph->ack_seq = 0;
+		tcph->fin = 0;
+	} else {
+		tcph->ack_seq = seqnum;
+		tcph->ack = 1;
+		tcph->fin = 1;				// !!
+	}
 	tcph->urg = 0;
 	tcph->window = htons(5840);
 	tcph->check = 0;
@@ -154,6 +161,14 @@ void CSender::Redirect(int user_port, int dst_port, Poco::Net::IPAddress &user_i
 	return;
 }
 
+void CSender::SendRST(int user_port, int dst_port, Poco::Net::IPAddress &user_ip, Poco::Net::IPAddress &dst_ip, uint32_t acknum, uint32_t seqnum, int f_psh)
+{
+	std::string empty_str;
+	// send rst to the client
+	this->sendPacket( dst_ip, user_ip, dst_port, user_port, acknum, seqnum, empty_str, 1, 0);
+	// send rst to the server
+	this->sendPacket( user_ip, dst_ip, user_port, dst_port, seqnum, acknum, empty_str, 1, 0 );
+}
 
 unsigned short CSender::csum( unsigned short *ptr, int nbytes )
 {

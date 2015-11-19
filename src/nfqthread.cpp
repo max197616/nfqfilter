@@ -51,12 +51,13 @@ struct membuf : std::streambuf
 	}
 };
 
-nfqThread::nfqThread(int queueNumber,int max_pending_packets,int mark_value):
+nfqThread::nfqThread(int queueNumber,int max_pending_packets,int mark_value, bool send_rst):
 	Task("nfqThread"),
 	_logger(Poco::Logger::get("nfqThread")),
 	_queueNumber(queueNumber),
 	_queue_maxlen(max_pending_packets*NFQ_BURST_FACTOR),
-	_mark_value(mark_value)
+	_mark_value(mark_value),
+	_send_rst(send_rst)
 {
 	memset(&_stats,0,sizeof(struct threadStats));
 }
@@ -254,10 +255,24 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			unsigned short port=ntohs(tcph->dest);
 			if (it_ip->second.find(port) != it_ip->second.end())
 			{
-				self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_mark_value,id,port);
-				Poco::Mutex::ScopedLock lock(self->_statsMutex);
-				self->_stats.marked_hosts++;
-				nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+				if(self->_send_rst)
+				{
+					Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
+					Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
+					int tcp_src_port=ntohs(tcph->source);
+					int tcp_dst_port=ntohs(tcph->dest);
+					self->_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip.toString(),dst_ip.toString(),id);
+					std::string empty_str;
+					SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip, dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+					Poco::Mutex::ScopedLock lock(self->_statsMutex);
+					self->_stats.sended_rst++;
+					nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
+				} else {
+					self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_mark_value,id,port);
+					Poco::Mutex::ScopedLock lock(self->_statsMutex);
+					self->_stats.marked_hosts++;
+					nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+				}
 				return 0;
 			}
 		}
@@ -328,10 +343,24 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				self->_logger.debug("SSL Host seek occupied %ld us, host: %s",sw.elapsed(),ssl_client);
 				if(found)
 				{
-					self->_logger.debug("Set mark %d to packet no %d, ssl host name: %s",self->_mark_value,id,ssl_client);
-					Poco::Mutex::ScopedLock lock(self->_statsMutex);
-					self->_stats.marked_ssl++;
-					nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+					if(self->_send_rst)
+					{
+						Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
+						Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
+						int tcp_src_port=ntohs(tcph->source);
+						int tcp_dst_port=ntohs(tcph->dest);
+						self->_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip.toString(),dst_ip.toString(),id);
+						std::string empty_str;
+						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip, dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+						Poco::Mutex::ScopedLock lock(self->_statsMutex);
+						self->_stats.sended_rst++;
+						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
+					} else {
+						self->_logger.debug("SSLHostList: Set mark %d to packet no %d, ssl host name: %s",self->_mark_value,id,ssl_client);
+						Poco::Mutex::ScopedLock lock(self->_statsMutex);
+						self->_stats.marked_ssl++;
+						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+					}
 					return 0;
 				}
 			} else {

@@ -50,7 +50,10 @@ void SenderTask::runTask()
 			RedirectNotification::Ptr pRedirectNf = pNf.cast<RedirectNotification>();
 			if (pRedirectNf)
 			{
-				sender->Redirect(pRedirectNf->user_port(), pRedirectNf->dst_port(),pRedirectNf->user_ip(),pRedirectNf->dst_ip(), pRedirectNf->acknum(), pRedirectNf->seqnum(), pRedirectNf->f_psh(), pRedirectNf->additional_param());
+				if(pRedirectNf->is_rst())
+					sender->SendRST(pRedirectNf->user_port(), pRedirectNf->dst_port(),pRedirectNf->user_ip(),pRedirectNf->dst_ip(), pRedirectNf->acknum(), pRedirectNf->seqnum(), pRedirectNf->f_psh());
+				else
+					sender->Redirect(pRedirectNf->user_port(), pRedirectNf->dst_port(),pRedirectNf->user_ip(),pRedirectNf->dst_ip(), pRedirectNf->acknum(), pRedirectNf->seqnum(), pRedirectNf->f_psh(), pRedirectNf->additional_param());
 			}
 		}
 	}

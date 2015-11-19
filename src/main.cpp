@@ -69,6 +69,7 @@ void nfqFilter::initialize(Application& self)
 	_statistic_interval=config().getInt("statistic_interval",0);
 	_max_pending_packets=config().getInt("max_pending_packets",DEFAULT_MAX_PENDING_PACKETS);
 
+	_send_rst=config().getBool("send_rst", false);
 	_mark_value=config().getInt("mark_value",MARK_VALUE);
 
 
@@ -285,7 +286,7 @@ int nfqFilter::main(const ArgVec& args)
 	{
 		Poco::TaskManager tm;
 		tm.start(new NFQStatisticTask(_statistic_interval));
-		tm.start(new nfqThread(_queueNumber,_max_pending_packets,_mark_value));
+		tm.start(new nfqThread(_queueNumber,_max_pending_packets,_mark_value,_send_rst));
 		tm.start(new SenderTask(_redirectUrl));
 		waitForTerminationRequest();
 		tm.cancelAll();

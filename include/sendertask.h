@@ -35,7 +35,7 @@ class RedirectNotification: public Poco::Notification
 public:
 	typedef Poco::AutoPtr<RedirectNotification> Ptr;
 	
-	RedirectNotification(int user_port, int dst_port, Poco::Net::IPAddress &user_ip, Poco::Net::IPAddress &dst_ip, uint32_t acknum, uint32_t seqnum, int f_psh, std::string &additional_param):
+	RedirectNotification(int user_port, int dst_port, Poco::Net::IPAddress &user_ip, Poco::Net::IPAddress &dst_ip, uint32_t acknum, uint32_t seqnum, int f_psh, std::string &additional_param, bool is_rst=false):
 		_user_port(user_port),
 		_dst_port(dst_port),
 		_user_ip(user_ip),
@@ -43,7 +43,8 @@ public:
 		_acknum(acknum),
 		_seqnum(seqnum),
 		_f_psh(f_psh),
-		_additional_param(additional_param)
+		_additional_param(additional_param),
+		_is_rst(is_rst)
 	{
 	}
 	int user_port()
@@ -78,6 +79,10 @@ public:
 	{
 		return _additional_param;
 	}
+	bool is_rst()
+	{
+		return _is_rst;
+	}
 private:
 	int _user_port;
 	int _dst_port;
@@ -87,9 +92,8 @@ private:
 	uint32_t _seqnum;
 	int _f_psh;
 	std::string _additional_param;
+	bool _is_rst;
 };
-
-
 
 class CSender;
 
