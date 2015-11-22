@@ -21,6 +21,7 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <linux/netfilter.h>
 #include <istream>
@@ -35,11 +36,14 @@
 #include "AhoCorasickPlus.h"
 
 #include <libndpi/ndpi_api.h>
+#include <memory>
 
 #include "sendertask.h"
 
 #define iphdr(x)	((struct iphdr *)(x))
 #define tcphdr(x)	((struct tcphdr *)(x))
+
+
 
 //#define OLD_DPI 1
 
@@ -91,13 +95,13 @@ void nfqThread::runTask()
 		return ;
 	}
 
-	if(nfq_unbind_pf(h,AF_INET) < 0)
+	if(nfq_unbind_pf(h,AF_INET6) < 0)
 	{
-		_logger.fatal("Error during nfq_bind_pf()");
+		_logger.fatal("Error during nfq_unbind_pf()");
 		return ;
 	}
 
-	if(nfq_bind_pf(h,AF_INET) < 0)
+	if(nfq_bind_pf(h,AF_INET6) < 0)
 	{
 		_logger.fatal("Error during nfq_bind_pf");
 		return ;
@@ -231,51 +235,82 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 		id = ntohl(ph->packet_id);
 		size = nfq_get_payload(nfa,&full_packet);
+
 		//int id_protocol = full_packet[9];
 		struct ip *iph = (struct ip *)full_packet;
+		struct ip6_hdr *iph6 = (struct ip6_hdr *)full_packet;
+
+		// определяем версию протокола
+		int ip_version=0;
+		if(iph->ip_v == 6)
+			ip_version = 6;
+		else if (iph->ip_v == 4)
+			ip_version = 4;
+		if(!ip_version)
+		{
+			self->_logger.error("Unsupported IP protocol version %d for packet id %d",(int) iph->ip_v, id);
+			nfq_set_verdict(qh,id,NF_ACCEPT,0,NULL);
+			return 0;
+		}
+
 		unsigned char *pkt_data_ptr = NULL;
 		struct tcphdr* tcph;
-		pkt_data_ptr = full_packet + sizeof(struct ip);
+
+		pkt_data_ptr = full_packet + (ip_version == 4 ? sizeof(struct ip) : sizeof(struct ip6_hdr));
+
 		tcph = (struct tcphdr *) pkt_data_ptr;
 
-		int iphlen = iphdr(full_packet)->ihl*4;
+		// длина ip заголовка
+		int iphlen = iphdr(full_packet)->ihl*4; // ipv4
+		if(ip_version == 6)
+			iphlen = sizeof(struct ip6_hdr);
+
+		// длина tcp заголовка
 		int tcphlen = tcphdr(full_packet+iphlen)->doff*4;
+
+		// общая длина всех заголовков
 		int hlen = iphlen + tcphlen;
-//		int ofs = iphlen + sizeof(struct tcphdr);
+
+		// пропускаем пакет без данных
 		if(hlen == size)
 		{
 			nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 			return 0;
 		}
 
-		// проверяем из списка hosts...
-		IPPortMap::Iterator it_ip=nfqFilter::_ipportMap.find(iph->ip_dst.s_addr);
-		if(it_ip != nfqFilter::_ipportMap.end())
+		if(ip_version == 4)
 		{
-			unsigned short port=ntohs(tcph->dest);
-			if (it_ip->second.find(port) != it_ip->second.end())
+			// проверяем из списка hosts ipv4...
+			IPPortMap::Iterator it_ip=nfqFilter::_ipportMap.find(iph->ip_dst.s_addr);
+			if(it_ip != nfqFilter::_ipportMap.end())
 			{
-				if(self->_send_rst)
+				unsigned short port=ntohs(tcph->dest);
+				if (it_ip->second.find(port) != it_ip->second.end())
 				{
-					Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
-					Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
-					int tcp_src_port=ntohs(tcph->source);
-					int tcp_dst_port=ntohs(tcph->dest);
-					self->_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip.toString(),dst_ip.toString(),id);
-					std::string empty_str;
-					SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip, dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
-					Poco::Mutex::ScopedLock lock(self->_statsMutex);
-					self->_stats.sended_rst++;
-					nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
-				} else {
-					self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_mark_value,id,port);
-					Poco::Mutex::ScopedLock lock(self->_statsMutex);
-					self->_stats.marked_hosts++;
-					nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+					if(self->_send_rst)
+					{
+						Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
+						Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
+						int tcp_src_port=ntohs(tcph->source);
+						int tcp_dst_port=ntohs(tcph->dest);
+						self->_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip.toString(),dst_ip.toString(),id);
+						std::string empty_str;
+						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,&src_ip, &dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+						Poco::Mutex::ScopedLock lock(self->_statsMutex);
+						self->_stats.sended_rst++;
+						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
+					} else {
+						self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_mark_value,id,port);
+						Poco::Mutex::ScopedLock lock(self->_statsMutex);
+						self->_stats.marked_hosts++;
+						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+					}
+					return 0;
 				}
-				return 0;
 			}
 		}
+		// todo: добавить поиск по ipv6
+
 		// nDPI usage
 		uint8_t *dpi_buf=NULL;
 		sw.reset();
@@ -305,6 +340,22 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		u_int32_t protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow, dpi_buf, size, current_tickt, src, dst);
 #else
 		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow, dpi_buf, size, current_tickt, src, dst);
+#if 0
+		// пробуем угадать протокол по портам...
+		if(protocol.protocol == NDPI_PROTOCOL_UNKNOWN)
+		{
+			int tcp_src_port=ntohs(tcph->source);
+			int tcp_dst_port=ntohs(tcph->dest);
+			self->_logger.information("Guessing protocol...");
+			protocol = ndpi_guess_undetected_protocol(nfqFilter::my_ndpi_struct,
+							   (ip_version == 4 ? iph->ip_id : iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt),
+							   0,//ip
+							   tcp_src_port, // sport
+							   0,
+							   tcp_dst_port); // dport
+
+		}
+#endif
 		self->_logger.debug("Protocol is %hu/%hu ",protocol.master_protocol,protocol.protocol);
 #endif
 		sw.stop();
@@ -345,13 +396,21 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				{
 					if(self->_send_rst)
 					{
-						Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
-						Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
+						std::unique_ptr<Poco::Net::IPAddress> src_ip;
+						std::unique_ptr<Poco::Net::IPAddress> dst_ip;
+						if(ip_version == 4)
+						{
+							src_ip.reset(new Poco::Net::IPAddress(&iph->ip_src,sizeof(in_addr)));
+							dst_ip.reset(new Poco::Net::IPAddress(&iph->ip_dst,sizeof(in_addr)));
+						} else {
+							src_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_src,sizeof(in6_addr)));
+							dst_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_dst,sizeof(in6_addr)));
+						}
 						int tcp_src_port=ntohs(tcph->source);
 						int tcp_dst_port=ntohs(tcph->dest);
-						self->_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip.toString(),dst_ip.toString(),id);
+						self->_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
 						std::string empty_str;
-						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip, dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
 						self->_stats.sended_rst++;
 						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
@@ -375,14 +434,23 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		if(protocol.master_protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_HTTP)
 #endif
 		{
-			Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
-			Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
+
+			std::unique_ptr<Poco::Net::IPAddress> src_ip;
+			std::unique_ptr<Poco::Net::IPAddress> dst_ip;
+			if(ip_version == 4)
+			{
+				src_ip.reset(new Poco::Net::IPAddress(&iph->ip_src,sizeof(in_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph->ip_dst,sizeof(in_addr)));
+			} else {
+				src_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_src,sizeof(in6_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_dst,sizeof(in6_addr)));
+			}
 			int tcp_src_port=ntohs(tcph->source);
 			int tcp_dst_port=ntohs(tcph->dest);
 #ifdef OLD_DPI
-			self->_logger.debug("Not http protocol. Protocol is %u from %s:%d to %s:%d",protocol,src_ip.toString(),tcp_src_port,dst_ip.toString(),tcp_dst_port);
+			self->_logger.debug("Not http protocol. Protocol is %u from %s:%d to %s:%d",protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 #else
-			self->_logger.debug("Not http protocol. Protocol is %hu/%hu from %s:%d to %s:%d",protocol.master_protocol,protocol.protocol,src_ip.toString(),tcp_src_port,dst_ip.toString(),tcp_dst_port);
+			self->_logger.debug("Not http protocol. Protocol is %hu/%hu from %s:%d to %s:%d",protocol.master_protocol,protocol.protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 #endif
 			ndpi_free_flow(flow);
 			free(dst);
@@ -403,13 +471,23 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		free(dpi_buf);
 
 		{
-			Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
-			Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
+
+			std::unique_ptr<Poco::Net::IPAddress> src_ip;
+			std::unique_ptr<Poco::Net::IPAddress> dst_ip;
+			if(ip_version == 4)
+			{
+				src_ip.reset(new Poco::Net::IPAddress(&iph->ip_src,sizeof(in_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph->ip_dst,sizeof(in_addr)));
+			} else {
+				src_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_src,sizeof(in6_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_dst,sizeof(in6_addr)));
+			}
+
 			int tcp_src_port=ntohs(tcph->source);
 			int tcp_dst_port=ntohs(tcph->dest);
 
 			Poco::Net::HTTPRequest request;
-			membuf sbuf((char*)full_packet+sizeof(struct ip)+(4*tcph->doff), (char*)full_packet+sizeof(struct ip)+(4*tcph->doff)+size - (tcph->doff*4) - sizeof(struct ip));
+			membuf sbuf((char*)full_packet+(ip_version == 4 ? sizeof(struct ip) : sizeof(struct ip6_hdr))+(4*tcph->doff), (char*)full_packet+(ip_version == 4 ? sizeof(struct ip) : sizeof(struct ip6_hdr))+(4*tcph->doff)+size - (tcph->doff*4) - (ip_version == 4 ? sizeof(struct ip) : sizeof(struct ip6_hdr)));
 			std::istream in(&sbuf);
 			try
 			{
@@ -418,13 +496,13 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			{
 				if(request.getMethod() != Poco::Net::HTTPRequest::HTTP_GET && request.getMethod() != Poco::Net::HTTPRequest::HTTP_POST && request.getMethod() != Poco::Net::HTTPRequest::HTTP_HEAD)
 				{
-					Poco::FileOutputStream pdump("/tmp/packet_dump-"+src_ip.toString(),std::ios::binary);
+					Poco::FileOutputStream pdump("/tmp/packet_dump-"+src_ip->toString(),std::ios::binary);
 					for(int i=0; i < size; i++)
 					{
 						pdump << (unsigned char) full_packet[i];
 					}
 					pdump.close();
-					self->_logger.warning("Not http packet: %s from %s packet size %d method %s host %s uri %s",excep.message(),src_ip.toString(),size,request.getMethod(),request.getHost(),request.getURI());
+					self->_logger.warning("Not http packet: %s from %s packet size %d method %s host %s uri %s",excep.message(),src_ip->toString(),size,request.getMethod(),request.getHost(),request.getURI());
 					nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 					return 0;
 				}
@@ -452,10 +530,10 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					self->_logger.debug("Host seek occupied %ld us",sw.elapsed());
 					if(it != nfqFilter::_domainsMap.end())
 					{
-						self->_logger.debug("Host " + host + " present in domain list from ip " + src_ip.toString());
+						self->_logger.debug("Host %s present in domain list from ip %s", host, src_ip->toString());
 //						std::string add_param("id="+std::to_string(it->second));
 						std::string add_param("url="+host);
-						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip, dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
+						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port, src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
 						self->_stats.redirected_domains++;
 						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
@@ -478,10 +556,10 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					self->_logger.debug("URL seek occupied %ld us for uri %s",sw.elapsed(),uri);
 					if(found)
 					{
-						self->_logger.debug("URL " + uri + " present in url (file pos %u) list from ip %s",match.id,src_ip.toString());
+						self->_logger.debug("URL %s present in url (file pos %u) list from ip %s",uri,match.id,src_ip->toString());
 						//std::string add_param("id="+std::to_string(match.id));
 						std::string add_param("url="+uri);
-						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip,dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
+						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(),dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
 						self->_stats.redirected_urls++;
 						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);

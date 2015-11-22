@@ -19,6 +19,8 @@
 
 #include "sender.h"
 #include <unistd.h>
+#include <netinet/ip6.h>
+#include <Poco/FileStream.h>
 
 struct pseudo_header
 {
@@ -29,27 +31,44 @@ struct pseudo_header
 	u_int16_t	tcp_length;
 };
 
+struct ipv6_pseudo_hdr
+{
+	struct in6_addr source_address;
+	struct in6_addr dest_address;
+	u_int32_t tcp_length;
+	u_int32_t  zero: 24,
+		   nexthdr: 8;
+};
+
 CSender::CSender( std::string url ) : _logger(Poco::Logger::get("CSender"))
 {
 	this->redirect_url = url;
 	this->s = ::socket( PF_INET, SOCK_RAW, IPPROTO_TCP );
 	if( s == -1 ) {
-		_logger.error("Failed to create socket!");
+		_logger.error("Failed to create IPv4 socket!");
 		return;
 	}
+	this->s6 = ::socket( PF_INET6, SOCK_RAW, IPPROTO_RAW );
+	if( s6 == -1 ) {
+		_logger.error("Failed to create IPv6 socket!");
+		return;
+	}
+
 	int one = 1;
 	const int *val = &one;
 	if( ::setsockopt(this->s, IPPROTO_IP, IP_HDRINCL, val, sizeof(one)) < 0 )
 	{
-		_logger.error("Error setting IP_HDRINCL");
+		_logger.error("Error setting IP_HDRINCL for IPv4 socket");
 		return;
 	}
+
 	this->rHeader = "HTTP/1.1 301 Moved Permanently\nLocation: " + this->redirect_url + "\nConnection: close\n";
 }
 
 CSender::~CSender()
 {
 	::close(s);
+	::close(s6);
 }
 
 void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip_to, int port_from, int port_to, uint32_t acknum, uint32_t seqnum, std::string &dt, int f_reset, int f_psh)
@@ -61,36 +80,57 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 	
 	// IP header
 	struct iphdr *iph = (struct iphdr *) datagram;
-	
+	struct ip6_hdr *iph6 = (struct ip6_hdr *) datagram;
+
 	// TCP header
-	struct tcphdr *tcph = (struct tcphdr *) (datagram + sizeof(struct ip));
+	struct tcphdr *tcph = (struct tcphdr *) (datagram + (ip_from.family() == Poco::Net::IPAddress::IPv4 ? sizeof(struct iphdr) : sizeof(struct ip6_hdr)));
+
 	struct sockaddr_in sin;
-	struct pseudo_header psh;
+	struct sockaddr_in6 sin6;
+	int payloadlen=dt.size();
 	
 	// Data part
-	data = datagram + sizeof(struct iphdr) + sizeof(struct tcphdr);
+	data = (char *)tcph + sizeof(struct tcphdr);
+	memcpy(data,dt.c_str(),payloadlen);
 
-	memcpy(data,dt.c_str(),dt.length());
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(port_to);
-	sin.sin_addr.s_addr=((in_addr *)ip_to.addr())->s_addr;
-	
-	// Fill the IP header
-	iph->ihl = 5;
-	iph->version = 4;
-	iph->tos=0;
-	iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + strlen(data);
-	iph->id = htons(random());
-	iph->frag_off = 0;
-	iph->ttl = 250;
-	iph->protocol = IPPROTO_TCP;
-	iph->check = 0;
-	iph->saddr = ((in_addr *)ip_from.addr())->s_addr;
-	iph->daddr = sin.sin_addr.s_addr;
-	
-	// IP checksum
-	iph->check = this->csum((unsigned short *) datagram, iph->tot_len);
-	
+	_logger.debug("Trying to send packet to %s port %d", ip_to.toString(), port_to);
+
+	if(ip_from.family() == Poco::Net::IPAddress::IPv4)
+	{
+		sin.sin_family = AF_INET;
+		sin.sin_port = htons(port_to);
+		sin.sin_addr.s_addr=((in_addr *)ip_to.addr())->s_addr;
+		// Fill the IPv4 header
+		iph->ihl = 5;
+		iph->version = 4;
+		iph->tos=0;
+		iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + payloadlen;
+		iph->id = htons(random());
+		iph->frag_off = 0;
+		iph->ttl = 250;
+		iph->protocol = IPPROTO_TCP;
+		iph->check = 0;
+		iph->saddr = ((in_addr *)ip_from.addr())->s_addr;
+		iph->daddr = sin.sin_addr.s_addr;
+		// IP checksum
+		iph->check = this->csum((unsigned short *) datagram, iph->tot_len);
+	} else {
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_port = 0; // not filled in ipv6
+		memcpy(&sin6.sin6_addr,ip_to.addr(),sizeof(sin6.sin6_addr));
+
+		// IPv6 version (4 bits), Traffic class (8 bits), Flow label (20 bits)
+		iph6->ip6_flow = htonl ((6 << 28) | (0 << 20) | 0);
+		// Payload length (16 bits): TCP header + TCP data
+		iph6->ip6_plen = htons (sizeof(struct tcphdr) + payloadlen);
+		// Next header (8 bits): 6 for TCP
+		iph6->ip6_nxt = IPPROTO_TCP;
+		 // Hop limit (8 bits): default to maximum value
+		iph6->ip6_hops = 250;
+		memcpy(&iph6->ip6_src,ip_from.addr(),sizeof(in6_addr));
+		memcpy(&iph6->ip6_dst,ip_to.addr(),sizeof(in6_addr));
+	}
+
 	// TCP Header
 	tcph->source = htons(port_from);
 	tcph->dest = htons(port_to);
@@ -111,27 +151,54 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 	}
 	tcph->urg = 0;
 	tcph->window = htons(5840);
-	tcph->check = 0;
+	tcph->check = 0; // done by kernel
 	tcph->urg_ptr = 0;
-	
-	psh.source_address = ((in_addr *)ip_from.addr())->s_addr;
-	psh.dest_address = sin.sin_addr.s_addr;
-	psh.placeholder = 0;
-	psh.protocol = IPPROTO_TCP;
-	psh.tcp_length = htons(sizeof(struct tcphdr) + dt.size() );
-	
-	int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + dt.size();
-	pseudogram = (char*)malloc(psize);
-	
-	memcpy( pseudogram, (char*) &psh, sizeof(struct pseudo_header));
-	memcpy( pseudogram + sizeof(struct pseudo_header), tcph, sizeof(struct tcphdr) + dt.size());
-	
-	tcph->check = csum( (unsigned short*) pseudogram, psize);
-	
-	// Send the packet
-	if( ::sendto( this->s, datagram, iph->tot_len, 0, (struct sockaddr *)&sin, sizeof(sin)) < 0 )
+
+
+
+	if(ip_from.family() == Poco::Net::IPAddress::IPv4)
 	{
-		_logger.error("sendto() failed to %s! ",ip_from.toString());
+		struct pseudo_header psh;
+		psh.source_address = ((in_addr *)ip_from.addr())->s_addr;
+		psh.dest_address = sin.sin_addr.s_addr;
+		psh.placeholder = 0;
+		psh.protocol = IPPROTO_TCP;
+		psh.tcp_length = htons(sizeof(struct tcphdr) + dt.size() );
+	
+		int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + dt.size();
+		pseudogram = (char*)malloc(psize);
+	
+		memcpy( pseudogram, (char*) &psh, sizeof(struct pseudo_header));
+		memcpy( pseudogram + sizeof(struct pseudo_header), tcph, sizeof(struct tcphdr) + dt.size());
+	
+		tcph->check = csum( (unsigned short*) pseudogram, psize);
+	
+		// Send the packet
+		if( ::sendto( this->s, datagram, iph->tot_len, 0, (struct sockaddr *)&sin, sizeof(sin)) < 0 )
+		{
+			_logger.error("sendto() failed to %s:%d errno: %d",ip_to.toString(), port_to, errno);
+		}
+	} else {
+		struct ipv6_pseudo_hdr psh;
+		// filling pseudoheader...
+		memcpy(&psh.source_address,&iph6->ip6_src,sizeof(iph6->ip6_src));
+		memcpy(&psh.dest_address,&iph6->ip6_dst,sizeof(iph6->ip6_dst));
+		psh.tcp_length = htonl(sizeof(tcphdr) + payloadlen);
+		psh.zero = 0;
+		psh.nexthdr = iph6->ip6_nxt;
+		int psize = sizeof(ipv6_pseudo_hdr) + sizeof(struct tcphdr) + payloadlen;
+
+		pseudogram = (char*)malloc(psize);
+		memcpy( pseudogram, (char*) &psh, sizeof(struct ipv6_pseudo_hdr));
+		memcpy( pseudogram + sizeof(struct ipv6_pseudo_hdr), tcph, sizeof(struct tcphdr) + dt.size());
+	
+		tcph->check = csum( (unsigned short*) pseudogram, psize);
+
+		// Send the packet
+		if( ::sendto( this->s6, datagram, (sizeof(struct ip6_hdr) + sizeof(struct tcphdr) + payloadlen), 0, (struct sockaddr *)&sin6, sizeof(sin6)) < 0 )
+		{
+			_logger.error("sendto() failed to [%s]:%d errno: %d",ip_to.toString(), port_to, errno);
+		}
 	}
 	if(pseudogram)
 		free(pseudogram);

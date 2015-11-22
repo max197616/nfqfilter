@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT(nfqfilter, 0.1, max1976@mail.ru)
+AC_INIT(nfqfilter, 0.2, max1976@mail.ru)
 
 AM_INIT_AUTOMAKE()
 

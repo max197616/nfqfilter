@@ -35,11 +35,11 @@ class RedirectNotification: public Poco::Notification
 public:
 	typedef Poco::AutoPtr<RedirectNotification> Ptr;
 	
-	RedirectNotification(int user_port, int dst_port, Poco::Net::IPAddress &user_ip, Poco::Net::IPAddress &dst_ip, uint32_t acknum, uint32_t seqnum, int f_psh, std::string &additional_param, bool is_rst=false):
+	RedirectNotification(int user_port, int dst_port, Poco::Net::IPAddress *user_ip, Poco::Net::IPAddress *dst_ip, uint32_t acknum, uint32_t seqnum, int f_psh, std::string &additional_param, bool is_rst=false):
 		_user_port(user_port),
 		_dst_port(dst_port),
-		_user_ip(user_ip),
-		_dst_ip(dst_ip),
+		_user_ip(*user_ip),
+		_dst_ip(*dst_ip),
 		_acknum(acknum),
 		_seqnum(seqnum),
 		_f_psh(f_psh),

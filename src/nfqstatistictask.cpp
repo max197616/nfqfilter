@@ -76,7 +76,7 @@ void NFQStatisticTask::OutStatistic()
 				struct threadStats stats;
 				Poco::AutoPtr<nfqThread> p=it->cast<nfqThread>();
 				p->getStats(stats);
-				app.logger().information("Thread '%s': redirected domains %" PRIu64 ", redirected urls: %" PRIu64 ", marked ssl: %" PRIu64 ", marked hosts: %" PRIu64,threadName,stats.redirected_domains,stats.redirected_urls,stats.marked_ssl,stats.marked_hosts);
+				app.logger().information("Thread '%s': redirected domains %" PRIu64 ", redirected urls: %" PRIu64 ", marked ssl: %" PRIu64 ", marked hosts: %" PRIu64 ", rst send: %" PRIu64, threadName,stats.redirected_domains,stats.redirected_urls,stats.marked_ssl,stats.marked_hosts,stats.sended_rst);
 			}
 			app.logger().information("State of task %s is %d", (*it)->name(), (int)(*it)->state());
 		}

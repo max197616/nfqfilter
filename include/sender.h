@@ -45,6 +45,7 @@ public:
 private:
 	unsigned short csum(unsigned short *ptr, int nbytes);
 	int s;
+	int s6;
 	std::string redirect_url;
 	std::string rHeader;
 	Poco::Logger& _logger;

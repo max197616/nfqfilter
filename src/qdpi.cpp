@@ -62,6 +62,10 @@ void debug_printf(u_int32_t protocol, void *id_struct, ndpi_log_level_t log_leve
 
     snprintf(out_buf, sizeof(out_buf), "%s %s%s", theDate, extra_msg, buf);
     printf("%s", out_buf);
+    Poco::Util::Application& app = Poco::Util::Application::instance();
+    std::string msg(&out_buf[0]);
+    app.logger().information("nDPI message: %s",msg);
+
     fflush(stdout);
 
     va_end(va_ap);
