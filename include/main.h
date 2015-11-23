@@ -56,11 +56,10 @@ public:
 	~nfqFilter();
 
 	static Poco::Mutex _domainMapMutex;
-	static DomainsMap _domainsMap;
 	static IPPortMap _ipportMap;
 
 	static Poco::Mutex _urlMapMutex;
-	static UrlsMap _urlsMap;
+
 	static struct ndpi_detection_module_struct* my_ndpi_struct;
 	static u_int32_t ndpi_size_flow_struct;
 	static u_int32_t ndpi_size_id_struct;
@@ -71,6 +70,8 @@ public:
 
 	static Poco::Mutex _sslMutex;
 	static AhoCorasickPlus *atm_ssl;
+	static AhoCorasickPlus *atm_domains;
+
 protected:
 	class ErrorHandler: public Poco::ErrorHandler
 	{

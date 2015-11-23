@@ -26,11 +26,9 @@
 #include "nfqthread.h"
 
 Poco::Mutex nfqFilter::_domainMapMutex;
-DomainsMap nfqFilter::_domainsMap;
 IPPortMap nfqFilter::_ipportMap;
 
 Poco::Mutex nfqFilter::_urlMapMutex;
-DomainsMap nfqFilter::_urlsMap;
 
 Poco::Mutex nfqFilter::_sslMutex;
 
@@ -45,6 +43,7 @@ AhoCorasickPlus *nfqFilter::atm=NULL;
 
 AhoCorasickPlus *nfqFilter::atm_ssl=NULL;
 
+AhoCorasickPlus *nfqFilter::atm_domains=NULL;
 
 nfqFilter::nfqFilter(): _helpRequested(false),_queueNumber(0),_errorHandler(*this)
 {
@@ -76,6 +75,8 @@ void nfqFilter::initialize(Application& self)
 	std::string _hostsFile=config().getString("hostlist","");
 
 	logger().information("Starting up on queue: %d",_queueNumber);
+
+	atm_domains=new AhoCorasickPlus();
 	
 	// читаем файл с доменами
 	Poco::FileInputStream df(_domainsFile);
@@ -88,12 +89,17 @@ void nfqFilter::initialize(Application& self)
 			getline(df,str);
 			if(!str.empty())
 			{
-				std::pair<DomainsMap::Iterator,bool> res=_domainsMap.insert(DomainsMap::ValueType(str,lineno));
-				if(res.second)
+				AhoCorasickPlus::EnumReturnStatus status;
+				AhoCorasickPlus::PatternId patId = lineno;
+				status = atm_domains->addPattern(str, patId);
+				if (status!=AhoCorasickPlus::RETURNSTATUS_SUCCESS)
 				{
-					logger().debug("Inserted domain: " + str + " from line %d",lineno);
-				} else {
-					logger().debug("Updated domain: " + str + " from line %d",lineno);
+					if(status == AhoCorasickPlus::RETURNSTATUS_DUPLICATE_PATTERN)
+					{
+						logger().warning("Pattern %s already present in domains list",str);
+					} else {
+						logger().error("Failed to add %s from line %d",str,lineno);
+					}
 				}
 			}
 			lineno++;
@@ -101,6 +107,8 @@ void nfqFilter::initialize(Application& self)
 	} else
 		throw Poco::OpenFileException(_domainsFile);
 	df.close();
+
+	atm_domains->finalize();
 
 	atm=new AhoCorasickPlus();
 

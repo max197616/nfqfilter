@@ -525,13 +525,19 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					sw.reset();
 					sw.start();
 					Poco::Mutex::ScopedLock lock(nfqFilter::_domainMapMutex);
-					DomainsMap::Iterator it=nfqFilter::_domainsMap.find(host);
+					nfqFilter::atm_domains->search(host,false);
+					AhoCorasickPlus::Match match;
+					bool found=false;
+					while(nfqFilter::atm_domains->findNext(match))
+					{
+						found=true;
+					}
 					sw.stop();
 					self->_logger.debug("Host seek occupied %ld us",sw.elapsed());
-					if(it != nfqFilter::_domainsMap.end())
+					if(found)
 					{
 						self->_logger.debug("Host %s present in domain list from ip %s", host, src_ip->toString());
-//						std::string add_param("id="+std::to_string(it->second));
+						//std::string add_param("id="+std::to_string(match.id));
 						std::string add_param("url="+host);
 						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port, src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
