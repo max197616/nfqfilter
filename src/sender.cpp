@@ -43,7 +43,7 @@ struct ipv6_pseudo_hdr
 CSender::CSender( std::string url ) : _logger(Poco::Logger::get("CSender"))
 {
 	this->redirect_url = url;
-	this->s = ::socket( PF_INET, SOCK_RAW, IPPROTO_TCP );
+	this->s = ::socket( PF_INET, SOCK_RAW, IPPROTO_RAW );
 	if( s == -1 ) {
 		_logger.error("Failed to create IPv4 socket!");
 		return;
@@ -113,7 +113,7 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 		iph->saddr = ((in_addr *)ip_from.addr())->s_addr;
 		iph->daddr = sin.sin_addr.s_addr;
 		// IP checksum
-		iph->check = this->csum((unsigned short *) datagram, iph->tot_len);
+		iph->check = 0; // done by kernel  //this->csum((unsigned short *) datagram, iph->tot_len);
 	} else {
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_port = 0; // not filled in ipv6
@@ -147,11 +147,11 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 	} else {
 		tcph->ack_seq = seqnum;
 		tcph->ack = 1;
-		tcph->fin = 1;				// !!
+		tcph->fin = 1;
 	}
 	tcph->urg = 0;
 	tcph->window = htons(5840);
-	tcph->check = 0; // done by kernel
+	tcph->check = 0;
 	tcph->urg_ptr = 0;
 
 
