@@ -62,7 +62,7 @@ CSender::CSender( std::string url ) : _logger(Poco::Logger::get("CSender"))
 		return;
 	}
 
-	this->rHeader = "HTTP/1.1 301 Moved Permanently\nLocation: " + this->redirect_url + "\nConnection: close\n";
+	this->rHeader = "HTTP/1.1 301 Moved Permanently\r\nLocation: " + this->redirect_url + "\r\nConnection: close\r\n";
 }
 
 CSender::~CSender()
@@ -213,7 +213,7 @@ void CSender::Redirect(int user_port, int dst_port, Poco::Net::IPAddress &user_i
 	std::string tstr=rHeader;
 	if(!additional_param.empty())
 	{
-		tstr = "HTTP/1.1 301 Moved Permanently\nLocation: " + this->redirect_url + additional_param + "\nConnection: close\n";
+		tstr = "HTTP/1.1 301 Moved Permanently\r\nLocation: " + this->redirect_url + additional_param + "\r\nConnection: close\r\n";
 	} else {
 		tstr=rHeader;
 	}
