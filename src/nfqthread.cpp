@@ -47,6 +47,8 @@
 
 //#define OLD_DPI 1
 
+//#define DEBUG_EXCEPTION 1
+
 struct membuf : std::streambuf
 {
 	membuf(char* begin, char* end)
@@ -55,13 +57,14 @@ struct membuf : std::streambuf
 	}
 };
 
-nfqThread::nfqThread(int queueNumber,int max_pending_packets,int mark_value, bool send_rst):
+nfqThread::nfqThread(int queueNumber,int max_pending_packets,int mark_value, bool send_rst, bool save_exception_dump):
 	Task("nfqThread"),
 	_logger(Poco::Logger::get("nfqThread")),
 	_queueNumber(queueNumber),
 	_queue_maxlen(max_pending_packets*NFQ_BURST_FACTOR),
 	_mark_value(mark_value),
-	_send_rst(send_rst)
+	_send_rst(send_rst),
+	_save_exception_dump(save_exception_dump)
 {
 	memset(&_stats,0,sizeof(struct threadStats));
 }
@@ -176,7 +179,7 @@ void nfqThread::runTask()
 					pdump << (unsigned char) buf[i];
 				}
 				pdump.close();
-				_logger.error("Got exception: %s",excep.message());
+				_logger.error("Got exception: %s:%s",excep.message(),excep.what());
 			} catch (...)
 			{
 				_logger.error("Unknown exception!");
@@ -496,13 +499,18 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			{
 				if(request.getMethod() != Poco::Net::HTTPRequest::HTTP_GET && request.getMethod() != Poco::Net::HTTPRequest::HTTP_POST && request.getMethod() != Poco::Net::HTTPRequest::HTTP_HEAD)
 				{
-					Poco::FileOutputStream pdump("/tmp/packet_dump-"+src_ip->toString(),std::ios::binary);
-					for(int i=0; i < size; i++)
+					self->_logger.warning("Got exception %s",excep.message());
+					if( self->_save_exception_dump)
 					{
-						pdump << (unsigned char) full_packet[i];
+						time_t ttm=time(NULL);
+						std::string s=std::to_string(ttm);
+						Poco::FileOutputStream pdump("/tmp/packet_dump_exception-"+s+"-"+src_ip->toString(),std::ios::binary);
+						for(int i=0; i < size; i++)
+						{
+							pdump << (unsigned char) full_packet[i];
+						}
+						pdump.close();
 					}
-					pdump.close();
-					self->_logger.warning("Not http packet: %s from %s packet size %d method %s host %s uri %s",excep.message(),src_ip->toString(),size,request.getMethod(),request.getHost(),request.getURI());
 					nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 					return 0;
 				}
@@ -577,6 +585,17 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			} catch (Poco::NotFoundException &excep)
 			{
 				self->_logger.warning("Got exсeption: not found key %s",excep.message());
+				if(self->_save_exception_dump)
+				{
+					time_t ttm=time(NULL);
+					std::string s=std::to_string(ttm);
+					Poco::FileOutputStream pdump("/tmp/packet_dump_exception-"+s+"-"+src_ip->toString(),std::ios::binary);
+					for(int i=0; i < size; i++)
+					{
+						pdump << (unsigned char) full_packet[i];
+					}
+					pdump.close();
+				}
 			} catch (Poco::Exception &excep)
 			{
 				self->_logger.warning("Got exception: %s",excep.message());
