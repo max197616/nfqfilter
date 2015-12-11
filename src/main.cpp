@@ -71,6 +71,8 @@ void nfqFilter::initialize(Application& self)
 	_send_rst=config().getBool("send_rst", false);
 	_mark_value=config().getInt("mark_value",MARK_VALUE);
 
+	_block_ssl_no_server=config().getBool("block_ssl_no_server",false);
+
 	_save_bad_packets=config().getBool("save_bad_packets",false);
 
 	std::string _hostsFile=config().getString("hostlist","");
@@ -295,7 +297,7 @@ int nfqFilter::main(const ArgVec& args)
 	{
 		Poco::TaskManager tm;
 		tm.start(new NFQStatisticTask(_statistic_interval));
-		tm.start(new nfqThread(_queueNumber,_max_pending_packets,_mark_value,_send_rst,_save_bad_packets));
+		tm.start(new nfqThread(_queueNumber,_max_pending_packets,_mark_value,_send_rst,_save_bad_packets,_block_ssl_no_server));
 		tm.start(new SenderTask(_redirectUrl));
 		waitForTerminationRequest();
 		tm.cancelAll();

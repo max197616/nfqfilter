@@ -120,6 +120,8 @@ private:
 	int _max_pending_packets;
 	int _mark_value;
 	bool _send_rst;
+	bool _save_bad_packets;
+	bool _block_ssl_no_server;
 	ErrorHandler _errorHandler;
 };
 

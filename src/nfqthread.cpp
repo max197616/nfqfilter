@@ -57,14 +57,15 @@ struct membuf : std::streambuf
 	}
 };
 
-nfqThread::nfqThread(int queueNumber,int max_pending_packets,int mark_value, bool send_rst, bool save_exception_dump):
+nfqThread::nfqThread(int queueNumber,int max_pending_packets,int mark_value, bool send_rst, bool save_exception_dump, bool block_ssl_no_server):
 	Task("nfqThread"),
 	_logger(Poco::Logger::get("nfqThread")),
 	_queueNumber(queueNumber),
 	_queue_maxlen(max_pending_packets*NFQ_BURST_FACTOR),
 	_mark_value(mark_value),
 	_send_rst(send_rst),
-	_save_exception_dump(save_exception_dump)
+	_save_exception_dump(save_exception_dump),
+	_block_ssl_no_server(block_ssl_no_server)
 {
 	memset(&_stats,0,sizeof(struct threadStats));
 }
@@ -329,20 +330,22 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 		struct ndpi_id_struct *src = NULL;
 		struct ndpi_id_struct *dst = NULL;
-		struct ndpi_flow_struct *flow = NULL;
+//		struct ndpi_flow_struct *flow = NULL;
+		std::unique_ptr<struct ndpi_flow_struct> flow;
+
 		src = (struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct);
 		memset(src, 0, nfqFilter::ndpi_size_id_struct);
 		dst = (struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct);
 		memset(dst, 0, nfqFilter::ndpi_size_id_struct);
 
-		flow = (struct ndpi_flow_struct *)malloc(nfqFilter::ndpi_size_flow_struct);
-		memset(flow, 0, nfqFilter::ndpi_size_flow_struct);
+		flow.reset((struct ndpi_flow_struct *)malloc(nfqFilter::ndpi_size_flow_struct));
+		memset(flow.get(), 0, nfqFilter::ndpi_size_flow_struct);
 
 		uint32_t current_tickt = 0;
 #ifdef OLD_DPI
 		u_int32_t protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow, dpi_buf, size, current_tickt, src, dst);
 #else
-		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow, dpi_buf, size, current_tickt, src, dst);
+		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow.get(), dpi_buf, size, current_tickt, src, dst);
 #if 0
 		// пробуем угадать протокол по портам...
 		if(protocol.protocol == NDPI_PROTOCOL_UNKNOWN)
@@ -370,14 +373,24 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 #endif
 		{
 			std::string ssl_client;
-//			std::string ssl_server;
+			std::unique_ptr<Poco::Net::IPAddress> src_ip;
+			std::unique_ptr<Poco::Net::IPAddress> dst_ip;
+			if(ip_version == 4)
+			{
+				src_ip.reset(new Poco::Net::IPAddress(&iph->ip_src,sizeof(in_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph->ip_dst,sizeof(in_addr)));
+			} else {
+				src_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_src,sizeof(in6_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_dst,sizeof(in6_addr)));
+			}
+			int tcp_src_port=ntohs(tcph->source);
+			int tcp_dst_port=ntohs(tcph->dest);
 			self->_logger.debug("Analysing SSL protocol");
 			if(flow->protos.ssl.client_certificate[0] != '\0')
 			{
 				ssl_client=flow->protos.ssl.client_certificate;
 				self->_logger.debug("SSL client is: %s",ssl_client);
 			}
-			ndpi_free_flow(flow);
 			free(dst);
 			free(src);
 			free(dpi_buf);
@@ -399,18 +412,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				{
 					if(self->_send_rst)
 					{
-						std::unique_ptr<Poco::Net::IPAddress> src_ip;
-						std::unique_ptr<Poco::Net::IPAddress> dst_ip;
-						if(ip_version == 4)
-						{
-							src_ip.reset(new Poco::Net::IPAddress(&iph->ip_src,sizeof(in_addr)));
-							dst_ip.reset(new Poco::Net::IPAddress(&iph->ip_dst,sizeof(in_addr)));
-						} else {
-							src_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_src,sizeof(in6_addr)));
-							dst_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_dst,sizeof(in6_addr)));
-						}
-						int tcp_src_port=ntohs(tcph->source);
-						int tcp_dst_port=ntohs(tcph->dest);
 						self->_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
 						std::string empty_str;
 						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
@@ -426,6 +427,36 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					return 0;
 				}
 			} else {
+				if(self->_block_ssl_no_server)
+				{
+					struct ndpi_packet_struct *packet_s = &(flow.get())->packet;
+					if(packet_s->payload[0] == 0x16 /* Handshake */)
+					{
+//						u_int16_t total_len  = (packet_s->payload[3] << 8) + packet_s->payload[4] + 5 /* SSL Header */;
+						u_int8_t handshake_protocol = packet_s->payload[5]; /* handshake protocol a bit misleading, it is message type according TLS specs */
+//						u_int16_t version = packet_s->payload[1];
+						if(handshake_protocol == 0x01 /* Client Hello */)
+						{
+							self->_logger.debug("Blocking/Marking SSL client hello packet from %s to %s", src_ip->toString(), dst_ip->toString());
+					
+							if(self->_send_rst)
+							{
+								self->_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+								std::string empty_str;
+								SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+								Poco::Mutex::ScopedLock lock(self->_statsMutex);
+								self->_stats.sended_rst++;
+								nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
+							} else {
+								self->_logger.debug("SSLClientHello: Set mark %d to packet no %d",self->_mark_value,id);
+								Poco::Mutex::ScopedLock lock(self->_statsMutex);
+								self->_stats.marked_ssl++;
+								nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+							}
+							return 0;
+						}
+					}
+				}
 				self->_logger.debug("No ssl client certificate found!");
 			}
 			nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
@@ -455,7 +486,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 #else
 			self->_logger.debug("Not http protocol. Protocol is %hu/%hu from %s:%d to %s:%d",protocol.master_protocol,protocol.protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 #endif
-			ndpi_free_flow(flow);
 			free(dst);
 			free(src);
 			free(dpi_buf);
@@ -468,7 +498,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 //		self->_logger.debug("Protocol %u/%s",protocol, protocol_name);
 
 		// освобождаем занятую память.
-		ndpi_free_flow(flow);
 		free(dst);
 		free(src);
 		free(dpi_buf);

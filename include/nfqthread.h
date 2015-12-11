@@ -40,7 +40,7 @@ struct threadStats
 class nfqThread: public Poco::Task
 {
 public:
-	nfqThread(int queueNumber, int max_pending_packets, int mark_value, bool send_rst);
+	nfqThread(int queueNumber, int max_pending_packets, int mark_value, bool send_rst, bool save_exception_dump, bool block_ssl_no_server);
 	virtual void runTask();
 	static int nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 	void getStats(threadStats &);
@@ -52,6 +52,8 @@ private:
 	int _queue_maxlen;
 	int _mark_value;
 	bool _send_rst;
+	bool _save_exception_dump;
+	bool _block_ssl_no_server;
 
 	struct threadStats _stats;
 	Poco::Mutex _statsMutex;
