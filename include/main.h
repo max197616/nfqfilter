@@ -34,6 +34,7 @@
 #include <set>
 #include <libndpi/ndpi_api.h>
 #include "sender.h"
+#include "nfqthread.h"
 
 /* Max packets processed simultaniously per thread. */
 #define DEFAULT_MAX_PENDING_PACKETS 1024
@@ -111,17 +112,13 @@ protected:
 private:
 	bool _helpRequested;
 	std::string _configFile;
-	int _queueNumber;
 	std::string _domainsFile;
 	std::string _urlsFile;
 	std::string _redirectUrl;
 	std::string _protocolsFile;
 	int _statistic_interval;
-	int _max_pending_packets;
-	int _mark_value;
-	bool _send_rst;
-	bool _save_bad_packets;
-	bool _block_ssl_no_server;
+	struct nfqConfig _config;
+
 	ErrorHandler _errorHandler;
 };
 

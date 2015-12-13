@@ -57,15 +57,11 @@ struct membuf : std::streambuf
 	}
 };
 
-nfqThread::nfqThread(int queueNumber,int max_pending_packets,int mark_value, bool send_rst, bool save_exception_dump, bool block_ssl_no_server):
+nfqThread::nfqThread(struct nfqConfig& cfg):
 	Task("nfqThread"),
 	_logger(Poco::Logger::get("nfqThread")),
-	_queueNumber(queueNumber),
-	_queue_maxlen(max_pending_packets*NFQ_BURST_FACTOR),
-	_mark_value(mark_value),
-	_send_rst(send_rst),
-	_save_exception_dump(save_exception_dump),
-	_block_ssl_no_server(block_ssl_no_server)
+	_config(cfg),
+	_queue_maxlen(cfg.max_pending_packets*NFQ_BURST_FACTOR)
 {
 	memset(&_stats,0,sizeof(struct threadStats));
 }
@@ -111,9 +107,9 @@ void nfqThread::runTask()
 		return ;
 	}
 
-	_logger.information("NFQ: Binding to queue %d",_queueNumber);
+	_logger.information("NFQ: Binding to queue %d",_config.queueNumber);
 
-	qh = nfq_create_queue(h,_queueNumber,&nfqueue_cb,this);
+	qh = nfq_create_queue(h,_config.queueNumber,&nfqueue_cb,this);
 
 	if(!qh)
 	{
@@ -218,7 +214,7 @@ void nfqThread::runTask()
 	nfq_close(h);
 	if(buf)
 		free(buf);
-	_logger.debug("Destroing queue %d",_queueNumber);
+	_logger.debug("Destroing queue %d",_config.queueNumber);
 }
 
 
@@ -291,7 +287,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				unsigned short port=ntohs(tcph->dest);
 				if (it_ip->second.find(port) != it_ip->second.end())
 				{
-					if(self->_send_rst)
+					if(self->_config.send_rst)
 					{
 						Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
 						Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
@@ -304,10 +300,10 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						self->_stats.sended_rst++;
 						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
 					} else {
-						self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_mark_value,id,port);
+						self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_config.mark_value,id,port);
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
 						self->_stats.marked_hosts++;
-						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
 					}
 					return 0;
 				}
@@ -410,7 +406,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				self->_logger.debug("SSL Host seek occupied %ld us, host: %s",sw.elapsed(),ssl_client);
 				if(found)
 				{
-					if(self->_send_rst)
+					if(self->_config.send_rst)
 					{
 						self->_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
 						std::string empty_str;
@@ -419,15 +415,15 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						self->_stats.sended_rst++;
 						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
 					} else {
-						self->_logger.debug("SSLHostList: Set mark %d to packet no %d, ssl host name: %s",self->_mark_value,id,ssl_client);
+						self->_logger.debug("SSLHostList: Set mark %d to packet no %d, ssl host name: %s",self->_config.mark_value,id,ssl_client);
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
 						self->_stats.marked_ssl++;
-						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
 					}
 					return 0;
 				}
 			} else {
-				if(self->_block_ssl_no_server)
+				if(self->_config.block_ssl_no_server)
 				{
 					struct ndpi_packet_struct *packet_s = &(flow.get())->packet;
 					if(packet_s->payload[0] == 0x16 /* Handshake */)
@@ -439,7 +435,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						{
 							self->_logger.debug("Blocking/Marking SSL client hello packet from %s to %s", src_ip->toString(), dst_ip->toString());
 					
-							if(self->_send_rst)
+							if(self->_config.send_rst)
 							{
 								self->_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
 								std::string empty_str;
@@ -448,10 +444,10 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 								self->_stats.sended_rst++;
 								nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
 							} else {
-								self->_logger.debug("SSLClientHello: Set mark %d to packet no %d",self->_mark_value,id);
+								self->_logger.debug("SSLClientHello: Set mark %d to packet no %d",self->_config.mark_value,id);
 								Poco::Mutex::ScopedLock lock(self->_statsMutex);
 								self->_stats.marked_ssl++;
-								nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_mark_value,0,NULL);
+								nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
 							}
 							return 0;
 						}
@@ -529,7 +525,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				if(request.getMethod() != Poco::Net::HTTPRequest::HTTP_GET && request.getMethod() != Poco::Net::HTTPRequest::HTTP_POST && request.getMethod() != Poco::Net::HTTPRequest::HTTP_HEAD)
 				{
 					self->_logger.warning("Got exception %s",excep.message());
-					if( self->_save_exception_dump)
+					if( self->_config.save_exception_dump)
 					{
 						time_t ttm=time(NULL);
 						std::string s=std::to_string(ttm);
@@ -614,7 +610,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			} catch (Poco::NotFoundException &excep)
 			{
 				self->_logger.warning("Got exсeption: not found key %s",excep.message());
-				if(self->_save_exception_dump)
+				if(self->_config.save_exception_dump)
 				{
 					time_t ttm=time(NULL);
 					std::string s=std::to_string(ttm);

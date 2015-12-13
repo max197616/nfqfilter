@@ -45,7 +45,7 @@ AhoCorasickPlus *nfqFilter::atm_ssl=NULL;
 
 AhoCorasickPlus *nfqFilter::atm_domains=NULL;
 
-nfqFilter::nfqFilter(): _helpRequested(false),_queueNumber(0),_errorHandler(*this)
+nfqFilter::nfqFilter(): _helpRequested(false),_errorHandler(*this)
 {
 	Poco::ErrorHandler::set(&_errorHandler);
 }
@@ -58,7 +58,13 @@ void nfqFilter::initialize(Application& self)
 	loadConfiguration();
 	ServerApplication::initialize(self);
 
-	_queueNumber=config().getInt("queue",0);
+	_config.queueNumber=config().getInt("queue",0);
+	_config.max_pending_packets=config().getInt("max_pending_packets",DEFAULT_MAX_PENDING_PACKETS);
+	_config.send_rst=config().getBool("send_rst", false);
+	_config.mark_value=config().getInt("mark_value",MARK_VALUE);
+	_config.block_ssl_no_server=config().getBool("block_ssl_no_server",false);
+	_config.save_exception_dump=config().getBool("save_bad_packets",false);
+
 	_domainsFile=config().getString("domainlist","");
 	_urlsFile=config().getString("urllist","");
 	_redirectUrl=config().getString("redirect_url","");
@@ -66,18 +72,13 @@ void nfqFilter::initialize(Application& self)
 
 	std::string _sslFile=config().getString("ssllist","");
 	_statistic_interval=config().getInt("statistic_interval",0);
-	_max_pending_packets=config().getInt("max_pending_packets",DEFAULT_MAX_PENDING_PACKETS);
 
-	_send_rst=config().getBool("send_rst", false);
-	_mark_value=config().getInt("mark_value",MARK_VALUE);
 
-	_block_ssl_no_server=config().getBool("block_ssl_no_server",false);
 
-	_save_bad_packets=config().getBool("save_bad_packets",false);
 
 	std::string _hostsFile=config().getString("hostlist","");
 
-	logger().information("Starting up on queue: %d",_queueNumber);
+	logger().information("Starting up on queue: %d",_config.queueNumber);
 
 	atm_domains=new AhoCorasickPlus();
 	
@@ -297,7 +298,7 @@ int nfqFilter::main(const ArgVec& args)
 	{
 		Poco::TaskManager tm;
 		tm.start(new NFQStatisticTask(_statistic_interval));
-		tm.start(new nfqThread(_queueNumber,_max_pending_packets,_mark_value,_send_rst,_save_bad_packets,_block_ssl_no_server));
+		tm.start(new nfqThread(_config));
 		tm.start(new SenderTask(_redirectUrl));
 		waitForTerminationRequest();
 		tm.cancelAll();
