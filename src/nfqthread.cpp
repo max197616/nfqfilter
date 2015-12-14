@@ -423,40 +423,10 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					return 0;
 				}
 			} else {
-				if(self->_config.block_ssl_no_server)
-				{
-					struct ndpi_packet_struct *packet_s = &(flow.get())->packet;
-					if(packet_s->payload[0] == 0x16 /* Handshake */)
-					{
-//						u_int16_t total_len  = (packet_s->payload[3] << 8) + packet_s->payload[4] + 5 /* SSL Header */;
-						u_int8_t handshake_protocol = packet_s->payload[5]; /* handshake protocol a bit misleading, it is message type according TLS specs */
-//						u_int16_t version = packet_s->payload[1];
-						if(handshake_protocol == 0x01 /* Client Hello */)
-						{
-							self->_logger.debug("Blocking/Marking SSL client hello packet from %s to %s", src_ip->toString(), dst_ip->toString());
-					
-							if(self->_config.send_rst)
-							{
-								self->_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
-								std::string empty_str;
-								SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
-								Poco::Mutex::ScopedLock lock(self->_statsMutex);
-								self->_stats.sended_rst++;
-								nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
-							} else {
-								self->_logger.debug("SSLClientHello: Set mark %d to packet no %d",self->_config.mark_value,id);
-								Poco::Mutex::ScopedLock lock(self->_statsMutex);
-								self->_stats.marked_ssl++;
-								nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
-							}
-							return 0;
-						}
-					}
-				}
 				self->_logger.debug("No ssl client certificate found!");
+				nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
+				return 0;
 			}
-			nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
-			return 0;
 		}
 #ifdef OLD_DPI
 		if(protocol != NDPI_PROTOCOL_HTTP)
@@ -477,6 +447,37 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			}
 			int tcp_src_port=ntohs(tcph->source);
 			int tcp_dst_port=ntohs(tcph->dest);
+			{
+				struct ndpi_packet_struct *packet_s = &(flow.get())->packet;
+				if(self->_config.block_undetected_ssl && flow->l4.tcp.ssl_stage >= 1)
+				{
+					if(packet_s->payload[0] == 0x16 /* Handshake */)
+					{
+						u_int8_t handshake_protocol = packet_s->payload[5]; /* handshake protocol a bit misleading, it is message type according TLS specs */
+						if(handshake_protocol == 0x01 /* Client Hello */)
+						{
+							self->_logger.debug("Blocking/Marking SSL client hello packet from %s to %s", src_ip->toString(), dst_ip->toString());
+							if(self->_config.send_rst)
+							{
+								self->_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+								std::string empty_str;
+								SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+								Poco::Mutex::ScopedLock lock(self->_statsMutex);
+								self->_stats.sended_rst++;
+								nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
+							} else {
+								self->_logger.debug("SSLClientHello: Set mark %d to packet no %d",self->_config.mark_value,id);
+								Poco::Mutex::ScopedLock lock(self->_statsMutex);
+								self->_stats.marked_ssl++;
+								nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
+							}
+							return 0;
+						}
+					}
+				}
+			}
+
+
 #ifdef OLD_DPI
 			self->_logger.debug("Not http protocol. Protocol is %u from %s:%d to %s:%d",protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 #else

@@ -35,7 +35,7 @@ struct nfqConfig
 	int mark_value;
 	bool send_rst;
 	bool save_exception_dump;
-	bool block_ssl_no_server;
+	bool block_undetected_ssl;
 };
 
 struct threadStats

@@ -62,7 +62,7 @@ void nfqFilter::initialize(Application& self)
 	_config.max_pending_packets=config().getInt("max_pending_packets",DEFAULT_MAX_PENDING_PACKETS);
 	_config.send_rst=config().getBool("send_rst", false);
 	_config.mark_value=config().getInt("mark_value",MARK_VALUE);
-	_config.block_ssl_no_server=config().getBool("block_ssl_no_server",false);
+	_config.block_undetected_ssl=config().getBool("block_undetected_ssl",false);
 	_config.save_exception_dump=config().getBool("save_bad_packets",false);
 
 	_domainsFile=config().getString("domainlist","");
