@@ -312,36 +312,35 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		// todo: добавить поиск по ipv6
 
 		// nDPI usage
-		uint8_t *dpi_buf=NULL;
+		std::unique_ptr<uint8_t> dpi_buf;
 		sw.reset();
 		sw.start();
-		dpi_buf = (uint8_t *)malloc(size);
-		if(dpi_buf == NULL)
+		dpi_buf.reset((uint8_t *)malloc(size));
+		if(dpi_buf.get() == NULL)
 		{
 			self->_logger.error("Can't allocate memory buffer!");
 			nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 			return 0;
 		}
-		memcpy(dpi_buf,full_packet,size);
+		memcpy(dpi_buf.get(),full_packet,size);
 
-		struct ndpi_id_struct *src = NULL;
-		struct ndpi_id_struct *dst = NULL;
-//		struct ndpi_flow_struct *flow = NULL;
+		std::unique_ptr<struct ndpi_id_struct> src;
+		std::unique_ptr<struct ndpi_id_struct> dst;
 		std::unique_ptr<struct ndpi_flow_struct> flow;
 
-		src = (struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct);
-		memset(src, 0, nfqFilter::ndpi_size_id_struct);
-		dst = (struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct);
-		memset(dst, 0, nfqFilter::ndpi_size_id_struct);
+		src.reset((struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct));
+		memset(src.get(), 0, nfqFilter::ndpi_size_id_struct);
+		dst.reset((struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct));
+		memset(dst.get(), 0, nfqFilter::ndpi_size_id_struct);
 
 		flow.reset((struct ndpi_flow_struct *)malloc(nfqFilter::ndpi_size_flow_struct));
 		memset(flow.get(), 0, nfqFilter::ndpi_size_flow_struct);
 
 		uint32_t current_tickt = 0;
 #ifdef OLD_DPI
-		u_int32_t protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow, dpi_buf, size, current_tickt, src, dst);
+		u_int32_t protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow, dpi_buf, size, current_tickt, src.get(), dst.get());
 #else
-		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow.get(), dpi_buf, size, current_tickt, src, dst);
+		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow.get(), dpi_buf.get(), size, current_tickt, src.get(), dst.get());
 #if 0
 		// пробуем угадать протокол по портам...
 		if(protocol.protocol == NDPI_PROTOCOL_UNKNOWN)
@@ -387,9 +386,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				ssl_client=flow->protos.ssl.client_certificate;
 				self->_logger.debug("SSL client is: %s",ssl_client);
 			}
-			free(dst);
-			free(src);
-			free(dpi_buf);
 			if(!ssl_client.empty())
 			{
 				sw.reset();
@@ -483,9 +479,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 #else
 			self->_logger.debug("Not http protocol. Protocol is %hu/%hu from %s:%d to %s:%d",protocol.master_protocol,protocol.protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 #endif
-			free(dst);
-			free(src);
-			free(dpi_buf);
 			nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 			return 0;
 		};
@@ -494,13 +487,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 //		self->_logger.debug("Protocol %u/%s",protocol, protocol_name);
 
-		// освобождаем занятую память.
-		free(dst);
-		free(src);
-		free(dpi_buf);
-
 		{
-
 			std::unique_ptr<Poco::Net::IPAddress> src_ip;
 			std::unique_ptr<Poco::Net::IPAddress> dst_ip;
 			if(ip_version == 4)
