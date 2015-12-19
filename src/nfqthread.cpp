@@ -390,6 +390,8 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			{
 				sw.reset();
 				sw.start();
+				if(self->_config.lower_host)
+					std::transform(ssl_client.begin(), ssl_client.end(), ssl_client.begin(), ::tolower);
 				Poco::Mutex::ScopedLock lock(nfqFilter::_sslMutex);
 				nfqFilter::atm_ssl->search(ssl_client,false);
 				AhoCorasickPlus::Match match;
@@ -543,6 +545,8 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					host.erase(host.length()-1,1);
 				}
 				{
+					if(self->_config.lower_host)
+						std::transform(host.begin(), host.end(), host.begin(), ::tolower);
 					sw.reset();
 					sw.start();
 					Poco::Mutex::ScopedLock lock(nfqFilter::_domainMapMutex);

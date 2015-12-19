@@ -36,6 +36,7 @@ struct nfqConfig
 	bool send_rst;
 	bool save_exception_dump;
 	bool block_undetected_ssl;
+	bool lower_host;
 };
 
 struct threadStats

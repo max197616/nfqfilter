@@ -64,6 +64,8 @@ void nfqFilter::initialize(Application& self)
 	_config.mark_value=config().getInt("mark_value",MARK_VALUE);
 	_config.block_undetected_ssl=config().getBool("block_undetected_ssl",false);
 	_config.save_exception_dump=config().getBool("save_bad_packets",false);
+	_config.lower_host=config().getBool("lower_host",false);
+
 
 	_domainsFile=config().getString("domainlist","");
 	_urlsFile=config().getString("urllist","");
