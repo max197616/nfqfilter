@@ -42,7 +42,7 @@
 // каким значением маркировать пакет, чтобы потом зарезать его файерволом
 #define MARK_VALUE 17
 
-typedef Poco::HashMap<std::string,int> DomainsMap;
+typedef Poco::HashMap<unsigned int, std::string> DomainsMap;
 typedef Poco::HashMap<std::string,int> UrlsMap;
 
 typedef Poco::HashMap<int,std::set<unsigned short>> IPPortMap;
@@ -57,6 +57,7 @@ public:
 	~nfqFilter();
 
 	static Poco::Mutex _domainMapMutex;
+	static DomainsMap _domainsMap;
 	static IPPortMap _ipportMap;
 
 	static Poco::Mutex _urlMapMutex;

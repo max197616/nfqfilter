@@ -26,6 +26,8 @@
 #include "nfqthread.h"
 
 Poco::Mutex nfqFilter::_domainMapMutex;
+DomainsMap nfqFilter::_domainsMap;
+
 IPPortMap nfqFilter::_ipportMap;
 
 Poco::Mutex nfqFilter::_urlMapMutex;
@@ -105,6 +107,14 @@ void nfqFilter::initialize(Application& self)
 						logger().warning("Pattern %s already present in domains list",str);
 					} else {
 						logger().error("Failed to add %s from line %d",str,lineno);
+					}
+				} else {
+					std::pair<DomainsMap::Iterator,bool> res=_domainsMap.insert(DomainsMap::ValueType(lineno,str));
+					if(res.second)
+					{
+						logger().debug("Inserted domain: " + str + " from line %d",lineno);
+					} else {
+						logger().debug("Updated domain: " + str + " from line %d",lineno);
 					}
 				}
 			}

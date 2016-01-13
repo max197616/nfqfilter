@@ -557,6 +557,23 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					{
 						found=true;
 					}
+					if(found)
+					{
+						DomainsMap::Iterator it=nfqFilter::_domainsMap.find(match.id);
+						if(it != nfqFilter::_domainsMap.end() && it->second != host)
+						{
+							std::size_t pos = host.find(it->second);
+							if(pos != std::string::npos)
+							{
+								std::string str1 = host.substr(0,pos);
+								// это не тот домен, который нужен
+								if(str1[str1.size()-1] != '.')
+									found=false;
+							} else {
+								found=false;
+							}
+						}
+					}
 					sw.stop();
 					self->_logger.debug("Host seek occupied %ld us",sw.elapsed());
 					if(found)
