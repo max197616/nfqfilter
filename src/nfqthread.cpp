@@ -400,6 +400,23 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				{
 					found=true;
 				}
+				if(found)
+				{
+					DomainsMap::Iterator it=nfqFilter::_domainsSSLMap.find(match.id);
+					if(it != nfqFilter::_domainsSSLMap.end() && it->second != ssl_client)
+					{
+						std::size_t pos = ssl_client.find(it->second);
+						if(pos != std::string::npos)
+						{
+							std::string str1 = ssl_client.substr(0,pos);
+							// это не тот домен, который нужен
+							if(str1[str1.size()-1] != '.')
+								found=false;
+						} else {
+							found=false;
+						}
+					}
+				}
 				sw.stop();
 				self->_logger.debug("SSL Host seek occupied %ld us, host: %s",sw.elapsed(),ssl_client);
 				if(found)
@@ -578,7 +595,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					self->_logger.debug("Host seek occupied %ld us",sw.elapsed());
 					if(found)
 					{
-						self->_logger.debug("Host %s present in domain list from ip %s", host, src_ip->toString());
+						self->_logger.debug("Host %s present in domain (file line %d) list from ip %s", host, match.id, src_ip->toString());
 						//std::string add_param("id="+std::to_string(match.id));
 						std::string add_param("url="+host);
 						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port, src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
@@ -599,6 +616,32 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					while(nfqFilter::atm->findNext(match))
 					{
 						found=true;
+					}
+					if(found)
+					{
+						DomainsMap::Iterator it=nfqFilter::_domainsUrlsMap.find(match.id);
+						if(it != nfqFilter::_domainsUrlsMap.end())
+						{
+							if(self->_config.match_host_exactly)
+							{
+								if(it->second != host)
+									found = false;
+							} else {
+								if(it->second != host)
+								{
+									std::size_t pos = host.find(it->second);
+									if(pos != std::string::npos)
+									{
+										std::string str1 = host.substr(0,pos);
+										// это не тот домен, который нужен
+										if(str1[str1.size()-1] != '.')
+											found = false;
+									} else {
+										found = false;
+									}
+								}
+							}
+						}
 					}
 					sw.stop();
 					self->_logger.debug("URL seek occupied %ld us for uri %s",sw.elapsed(),uri);

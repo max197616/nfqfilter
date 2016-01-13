@@ -22,7 +22,8 @@
 
  iptables -A FORWARD -m mark --mark 17 -p tcp -j REJECT --reject-with tcp-reset
 
- где 17, это значение из конфика nfqfilter.
+ где 17, это значение из конфига nfqfilter.
 
+Так же вместо маркировки трафика можно сразу посылать TCP RST клиенту и серверу, если указать в конфиге send_rst = true .
 
 В каталоге contrib находятся примеры файлов для работы фильтра.

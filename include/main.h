@@ -58,6 +58,9 @@ public:
 
 	static Poco::Mutex _domainMapMutex;
 	static DomainsMap _domainsMap;
+	static DomainsMap _domainsUrlsMap;
+	static DomainsMap _domainsSSLMap;
+
 	static IPPortMap _ipportMap;
 
 	static Poco::Mutex _urlMapMutex;

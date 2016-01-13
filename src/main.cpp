@@ -27,6 +27,8 @@
 
 Poco::Mutex nfqFilter::_domainMapMutex;
 DomainsMap nfqFilter::_domainsMap;
+DomainsMap nfqFilter::_domainsUrlsMap;
+DomainsMap nfqFilter::_domainsSSLMap;
 
 IPPortMap nfqFilter::_ipportMap;
 
@@ -67,7 +69,7 @@ void nfqFilter::initialize(Application& self)
 	_config.block_undetected_ssl=config().getBool("block_undetected_ssl",false);
 	_config.save_exception_dump=config().getBool("save_bad_packets",false);
 	_config.lower_host=config().getBool("lower_host",false);
-
+	_config.match_host_exactly=config().getBool("match_host_exactly",false);
 
 	_domainsFile=config().getString("domainlist","");
 	_urlsFile=config().getString("urllist","");
@@ -152,6 +154,23 @@ void nfqFilter::initialize(Application& self)
 					} else {
 						logger().error("Failed to add %s from line %d",str,lineno);
 					}
+				} else {
+					std::size_t pos = str.find("/");
+					if(pos != std::string::npos)
+					{
+						std::string host = str.substr(0,pos);
+						std::pair<DomainsMap::Iterator,bool> res=_domainsUrlsMap.insert(DomainsMap::ValueType(lineno,host));
+						if(res.second)
+						{
+							logger().debug("Inserted domain: " + str + " from line %d",lineno);
+						} else {
+							logger().debug("Updated domain: " + str + " from line %d",lineno);
+						}
+					} else {
+						logger().fatal("Bad url format in line %d",lineno);
+						throw Poco::Exception("Bad url format");
+					}
+
 				}
 			}
 			lineno++;
@@ -187,6 +206,14 @@ void nfqFilter::initialize(Application& self)
 							logger().warning("Pattern %s already present in SSL database",str);
 						} else {
 							logger().error("Failed to add %s from line %d",str,lineno);
+						}
+					} else {
+						std::pair<DomainsMap::Iterator,bool> res=_domainsSSLMap.insert(DomainsMap::ValueType(lineno,str));
+						if(res.second)
+						{
+							logger().debug("Inserted domain: " + str + " from line %d",lineno);
+						} else {
+							logger().debug("Updated domain: " + str + " from line %d",lineno);
 						}
 					}
 				}
