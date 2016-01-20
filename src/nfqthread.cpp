@@ -396,12 +396,9 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				nfqFilter::atm_ssl->search(ssl_client,false);
 				AhoCorasickPlus::Match match;
 				bool found=false;
-				while(nfqFilter::atm_ssl->findNext(match))
+				while(nfqFilter::atm_ssl->findNext(match) && !found)
 				{
 					found=true;
-				}
-				if(found)
-				{
 					DomainsMap::Iterator it=nfqFilter::_domainsSSLMap.find(match.id);
 					if(it != nfqFilter::_domainsSSLMap.end() && it->second != ssl_client)
 					{
@@ -570,12 +567,9 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					nfqFilter::atm_domains->search(host,false);
 					AhoCorasickPlus::Match match;
 					bool found=false;
-					while(nfqFilter::atm_domains->findNext(match))
+					while(nfqFilter::atm_domains->findNext(match) && !found)
 					{
 						found=true;
-					}
-					if(found)
-					{
 						DomainsMap::Iterator it=nfqFilter::_domainsMap.find(match.id);
 						if(it != nfqFilter::_domainsMap.end() && it->second != host)
 						{
@@ -613,12 +607,9 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					nfqFilter::atm->search(uri,false);
 					AhoCorasickPlus::Match match;
 					bool found=false;
-					while(nfqFilter::atm->findNext(match))
+					while(nfqFilter::atm->findNext(match) && !found)
 					{
 						found=true;
-					}
-					if(found)
-					{
 						DomainsMap::Iterator it=nfqFilter::_domainsUrlsMap.find(match.id);
 						if(it != nfqFilter::_domainsUrlsMap.end())
 						{
