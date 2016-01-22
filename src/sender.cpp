@@ -166,7 +166,7 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 		psh.tcp_length = htons(sizeof(struct tcphdr) + dt.size() );
 	
 		int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + dt.size();
-		pseudogram = (char*)malloc(psize);
+		pseudogram = (char*)calloc(1,psize);
 	
 		memcpy( pseudogram, (char*) &psh, sizeof(struct pseudo_header));
 		memcpy( pseudogram + sizeof(struct pseudo_header), tcph, sizeof(struct tcphdr) + dt.size());
@@ -188,7 +188,7 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 		psh.nexthdr = iph6->ip6_nxt;
 		int psize = sizeof(ipv6_pseudo_hdr) + sizeof(struct tcphdr) + payloadlen;
 
-		pseudogram = (char*)malloc(psize);
+		pseudogram = (char*)calloc(1,psize);
 		memcpy( pseudogram, (char*) &psh, sizeof(struct ipv6_pseudo_hdr));
 		memcpy( pseudogram + sizeof(struct ipv6_pseudo_hdr), tcph, sizeof(struct tcphdr) + dt.size());
 	

@@ -63,7 +63,7 @@ nfqThread::nfqThread(struct nfqConfig& cfg):
 	_config(cfg),
 	_queue_maxlen(cfg.max_pending_packets*NFQ_BURST_FACTOR)
 {
-	memset(&_stats,0,sizeof(struct threadStats));
+	_stats={0};
 }
 
 void nfqThread::getStats(threadStats &st)
@@ -81,7 +81,7 @@ void nfqThread::runTask()
 	int opt;
 
 	char *buf;
-	buf=(char *)malloc(T_DATA_SIZE);
+	buf=(char *)calloc(1,T_DATA_SIZE);
 	if(buf == NULL)
 	{
 		_logger.error("Unable to get memory for buffer");
@@ -315,7 +315,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		std::unique_ptr<uint8_t> dpi_buf;
 		sw.reset();
 		sw.start();
-		dpi_buf.reset((uint8_t *)malloc(size));
+		dpi_buf.reset((uint8_t *)calloc(1,size));
 		if(dpi_buf.get() == NULL)
 		{
 			self->_logger.error("Can't allocate memory buffer!");
@@ -328,13 +328,10 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		std::unique_ptr<struct ndpi_id_struct> dst;
 		std::unique_ptr<struct ndpi_flow_struct> flow;
 
-		src.reset((struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct));
-		memset(src.get(), 0, nfqFilter::ndpi_size_id_struct);
-		dst.reset((struct ndpi_id_struct*)malloc(nfqFilter::ndpi_size_id_struct));
-		memset(dst.get(), 0, nfqFilter::ndpi_size_id_struct);
+		src.reset((struct ndpi_id_struct*)calloc(1,nfqFilter::ndpi_size_id_struct));
+		dst.reset((struct ndpi_id_struct*)calloc(1,nfqFilter::ndpi_size_id_struct));
 
-		flow.reset((struct ndpi_flow_struct *)malloc(nfqFilter::ndpi_size_flow_struct));
-		memset(flow.get(), 0, nfqFilter::ndpi_size_flow_struct);
+		flow.reset((struct ndpi_flow_struct *)calloc(1,nfqFilter::ndpi_size_flow_struct));
 
 		uint32_t current_tickt = 0;
 #ifdef OLD_DPI

@@ -42,11 +42,11 @@ struct nfqConfig
 
 struct threadStats
 {
-	u_int64_t marked_ssl;
-	u_int64_t redirected_domains;
-	u_int64_t redirected_urls;
-	u_int64_t marked_hosts;
-	u_int64_t sended_rst;
+	uint64_t marked_ssl;
+	uint64_t redirected_domains;
+	uint64_t redirected_urls;
+	uint64_t marked_hosts;
+	uint64_t sended_rst;
 };
 
 class nfqThread: public Poco::Task

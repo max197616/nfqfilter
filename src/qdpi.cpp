@@ -28,7 +28,7 @@ static void *malloc_wrapper(unsigned long size)
 	nfqFilter::current_ndpi_memory += size;
 	if(nfqFilter::current_ndpi_memory > nfqFilter::max_ndpi_memory)
 		nfqFilter::max_ndpi_memory = nfqFilter::current_ndpi_memory;
-	return malloc(size);
+	return calloc(1,size);
 }
 
 static void free_wrapper(void *freeable)
