@@ -285,14 +285,14 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			if(it_ip != nfqFilter::_ipportMap.end())
 			{
 				unsigned short port=ntohs(tcph->dest);
-				if (it_ip->second.find(port) != it_ip->second.end())
+				if (it_ip->second.size() == 0 || it_ip->second.find(port) != it_ip->second.end())
 				{
 					if(self->_config.send_rst)
 					{
 						Poco::Net::IPAddress src_ip(&iph->ip_src,sizeof(in_addr));
 						Poco::Net::IPAddress dst_ip(&iph->ip_dst,sizeof(in_addr));
 						int tcp_src_port=ntohs(tcph->source);
-						int tcp_dst_port=ntohs(tcph->dest);
+						int tcp_dst_port=port;
 						self->_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip.toString(),dst_ip.toString(),id);
 						std::string empty_str;
 						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,&src_ip, &dst_ip,/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));

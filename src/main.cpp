@@ -228,7 +228,7 @@ void nfqFilter::initialize(Application& self)
 
 	if(!_hostsFile.empty())
 	{
-		// читаем файл с ssl hosts
+		// читаем файл с hosts
 		Poco::FileInputStream hf(_hostsFile);
 		if(hf.good())
 		{
@@ -239,23 +239,33 @@ void nfqFilter::initialize(Application& self)
 				getline(hf,str);
 				if(!str.empty())
 				{
-					std::string ip=str.substr(0, str.find(":"));
-					std::string port=str.substr(str.find(":")+1,str.length());
-					logger().debug("IP is %s port %s",ip,port);
-					unsigned short porti=atoi(port.c_str());
+					std::size_t found=str.find(":");
+					std::string ip=str.substr(0, found);
+					std::string port;
+					unsigned short porti=0;
+					if(found != std::string::npos)
+					{
+						port=str.substr(found+1,str.length());
+						logger().debug("IP is %s port %s",ip,port);
+						porti=atoi(port.c_str());
+					} else {
+						logger().debug("IP %s without port", ip);
+					}
 					struct in_addr _ip;
-
 					inet_pton(AF_INET, ip.c_str(), &_ip);
-
 					IPPortMap::Iterator it=_ipportMap.find(_ip.s_addr);
 					if(it == _ipportMap.end())
 					{
 						std::set<unsigned short> ports;
-						ports.insert(porti);
+						if(porti)
+						{
+							logger().debug("Adding port %s to ip %s", port, ip);
+							ports.insert(porti);
+						}
 						_ipportMap.insert(IPPortMap::ValueType(_ip.s_addr,ports));
-						logger().debug("Inserted ip: " + ip + " port:  " + port + " from line %d",lineno);
+						logger().debug("Inserted ip: %s from line %d", ip, lineno);
 					} else {
-						logger().debug("Adding port " + port + " from line %d to ip %s",lineno,ip);
+						logger().debug("Adding port %s from line %d to ip %s", port,lineno,ip);
 						it->second.insert(porti);
 					}
 					
