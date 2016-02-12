@@ -27,7 +27,7 @@
 #include <Poco/Logger.h>
 #include <Poco/Net/IPAddress.h>
 
-
+#include "sender.h"
 
 class RedirectNotification: public Poco::Notification
 	// The notification sent to worker threads.
@@ -95,13 +95,11 @@ private:
 	bool _is_rst;
 };
 
-class CSender;
-
 /// Данная задача отсылает редирект заданному клиенту
 class SenderTask: public Poco::Task
 {
 public:
-	SenderTask(std::string &redirect_url);
+	SenderTask(struct CSender::params &prm);
 	~SenderTask();
 
 	void runTask();

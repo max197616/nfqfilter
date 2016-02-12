@@ -40,9 +40,8 @@ struct ipv6_pseudo_hdr
 		   nexthdr: 8;
 };
 
-CSender::CSender( std::string url ) : _logger(Poco::Logger::get("CSender"))
+CSender::CSender(struct params &prm) : _logger(Poco::Logger::get("CSender")), _parameters(prm)
 {
-	this->redirect_url = url;
 	this->s = ::socket( PF_INET, SOCK_RAW, IPPROTO_RAW );
 	if( s == -1 ) {
 		_logger.error("Failed to create IPv4 socket!");
@@ -62,7 +61,7 @@ CSender::CSender( std::string url ) : _logger(Poco::Logger::get("CSender"))
 		return;
 	}
 
-	this->rHeader = "HTTP/1.1 301 Moved Permanently\r\nLocation: " + this->redirect_url + "\r\nConnection: close\r\n";
+	this->rHeader = "HTTP/1.1 "+_parameters.code+"\r\nLocation: " + _parameters.redirect_url + "\r\nConnection: close\r\n";
 }
 
 CSender::~CSender()
@@ -213,7 +212,7 @@ void CSender::Redirect(int user_port, int dst_port, Poco::Net::IPAddress &user_i
 	std::string tstr=rHeader;
 	if(!additional_param.empty())
 	{
-		tstr = "HTTP/1.1 301 Moved Permanently\r\nLocation: " + this->redirect_url + additional_param + "\r\nConnection: close\r\n";
+		tstr = "HTTP/1.1 "+_parameters.code+"\r\nLocation: " + _parameters.redirect_url + additional_param + "\r\nConnection: close\r\n";
 	} else {
 		tstr=rHeader;
 	}

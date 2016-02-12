@@ -587,8 +587,15 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					if(found)
 					{
 						self->_logger.debug("Host %s present in domain (file line %d) list from ip %s", host, match.id, src_ip->toString());
-						//std::string add_param("id="+std::to_string(match.id));
-						std::string add_param("url="+host);
+						std::string add_param;
+						switch (self->_config.add_p_type)
+						{
+							case A_TYPE_ID: add_param="id="+std::to_string(match.id);
+									break;
+							case A_TYPE_URL: add_param="url="+host;
+									break;
+							default: break;
+						}
 						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port, src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
 						self->_stats.redirected_domains++;
@@ -636,8 +643,15 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					if(found)
 					{
 						self->_logger.debug("URL %s present in url (file pos %u) list from ip %s",uri,match.id,src_ip->toString());
-						//std::string add_param("id="+std::to_string(match.id));
-						std::string add_param("url="+uri);
+						std::string add_param;
+						switch (self->_config.add_p_type)
+						{
+							case A_TYPE_ID: add_param="id="+std::to_string(match.id);
+									break;
+							case A_TYPE_URL: add_param="url="+uri;
+									break;
+							default: break;
+						}
 						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(),dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),add_param));
 						Poco::Mutex::ScopedLock lock(self->_statsMutex);
 						self->_stats.redirected_urls++;

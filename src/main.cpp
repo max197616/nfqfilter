@@ -49,6 +49,8 @@ AhoCorasickPlus *nfqFilter::atm_ssl=NULL;
 
 AhoCorasickPlus *nfqFilter::atm_domains=NULL;
 
+std::map<std::string, ADD_P_TYPES> add_type_s;
+
 nfqFilter::nfqFilter(): _helpRequested(false),_errorHandler(*this)
 {
 	Poco::ErrorHandler::set(&_errorHandler);
@@ -57,6 +59,7 @@ nfqFilter::nfqFilter(): _helpRequested(false),_errorHandler(*this)
 nfqFilter::~nfqFilter()
 {
 }
+
 void nfqFilter::initialize(Application& self)
 {
 	loadConfiguration();
@@ -71,9 +74,24 @@ void nfqFilter::initialize(Application& self)
 	_config.lower_host=config().getBool("lower_host",false);
 	_config.match_host_exactly=config().getBool("match_host_exactly",false);
 
+	std::string add_p_type=config().getString("url_additional_info","none");
+	std::transform(add_p_type.begin(), add_p_type.end(), add_p_type.begin(), ::tolower);
+
+	add_type_s["none"]=A_TYPE_NONE;
+	add_type_s["line"]=A_TYPE_ID;
+	add_type_s["url"]=A_TYPE_URL;
+
+	std::map<std::string, ADD_P_TYPES>::iterator it=add_type_s.find(add_p_type);
+	if(it == add_type_s.end())
+	{
+		throw Poco::Exception("Unknown url_additional_info type '" + add_p_type + "'",404);
+	}
+	_config.add_p_type=it->second;
+	logger().debug("URL additional info set to %s", add_p_type);
+
 	_domainsFile=config().getString("domainlist","");
 	_urlsFile=config().getString("urllist","");
-	_redirectUrl=config().getString("redirect_url","");
+	_sender_params.redirect_url=config().getString("redirect_url","");
 	_protocolsFile=config().getString("protocols","");
 
 	std::string _sslFile=config().getString("ssllist","");
@@ -348,7 +366,7 @@ int nfqFilter::main(const ArgVec& args)
 		Poco::TaskManager tm;
 		tm.start(new NFQStatisticTask(_statistic_interval));
 		tm.start(new nfqThread(_config));
-		tm.start(new SenderTask(_redirectUrl));
+		tm.start(new SenderTask(_sender_params));
 		waitForTerminationRequest();
 		tm.cancelAll();
 		SenderTask::queue.wakeUpAll();

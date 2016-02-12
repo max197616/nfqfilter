@@ -35,9 +35,16 @@
 #include <Poco/Logger.h>
 #include <Poco/Net/IPAddress.h>
 
+
 class CSender {
 public:
+	struct params
+	{
+		std::string redirect_url;
+		std::string code="HTTP/1.1 302 Moved Temporarily";
+	};
 	CSender( std::string url );
+	CSender(struct params &prm);
 	~CSender();
 	void Redirect(int user_port, int dst_port, Poco::Net::IPAddress &src_ip, Poco::Net::IPAddress &dst_ip, uint32_t acknum, uint32_t seqnum, int f_psh, std::string &additional_param);
 	void sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip_to, int port_from, int port_to, uint32_t acknum, uint32_t seqnum, std::string &dt, int f_reset, int f_psh);
@@ -46,10 +53,9 @@ private:
 	unsigned short csum(unsigned short *ptr, int nbytes);
 	int s;
 	int s6;
-	std::string redirect_url;
 	std::string rHeader;
 	Poco::Logger& _logger;
-
+	struct params _parameters;
 };
 
 

@@ -118,12 +118,12 @@ private:
 	std::string _configFile;
 	std::string _domainsFile;
 	std::string _urlsFile;
-	std::string _redirectUrl;
 	std::string _protocolsFile;
 	int _statistic_interval;
 	struct nfqConfig _config;
 
 	ErrorHandler _errorHandler;
+	struct CSender::params _sender_params;
 };
 
 #endif

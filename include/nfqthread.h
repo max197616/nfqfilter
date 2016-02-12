@@ -27,6 +27,7 @@
 
 #define NFQ_BURST_FACTOR 4
 
+enum ADD_P_TYPES { A_TYPE_NONE, A_TYPE_ID, A_TYPE_URL };
 
 struct nfqConfig
 {
@@ -38,6 +39,7 @@ struct nfqConfig
 	bool block_undetected_ssl;
 	bool lower_host;
 	bool match_host_exactly;
+	enum ADD_P_TYPES add_p_type;
 };
 
 struct threadStats

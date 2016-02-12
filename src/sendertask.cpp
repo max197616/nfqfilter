@@ -24,9 +24,9 @@
 Poco::FastMutex SenderTask::_mutex;
 Poco::NotificationQueue SenderTask::queue;
 
-SenderTask::SenderTask(std::string &redirect_url):
+SenderTask::SenderTask(struct CSender::params &prm):
 	Task("SenderTask"),
-	sender(new CSender(redirect_url)),
+	sender(new CSender(prm)),
 	_logger(Poco::Logger::get("SenderTask"))
 {
 
