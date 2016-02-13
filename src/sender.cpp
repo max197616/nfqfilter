@@ -62,6 +62,7 @@ CSender::CSender(struct params &prm) : _logger(Poco::Logger::get("CSender")), _p
 	}
 
 	this->rHeader = "HTTP/1.1 "+_parameters.code+"\r\nLocation: " + _parameters.redirect_url + "\r\nConnection: close\r\n";
+	_logger.debug("Default header is %s", rHeader);
 }
 
 CSender::~CSender()

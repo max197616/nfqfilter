@@ -41,7 +41,7 @@ public:
 	struct params
 	{
 		std::string redirect_url;
-		std::string code="HTTP/1.1 302 Moved Temporarily";
+		std::string code="302 Moved Temporarily";
 	};
 	CSender( std::string url );
 	CSender(struct params &prm);

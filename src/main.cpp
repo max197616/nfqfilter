@@ -89,6 +89,14 @@ void nfqFilter::initialize(Application& self)
 	_config.add_p_type=it->second;
 	logger().debug("URL additional info set to %s", add_p_type);
 
+	std::string http_code=config().getString("http_code","");
+	if(!http_code.empty())
+	{
+		http_code.erase(std::remove(http_code.begin(), http_code.end(), '"'), http_code.end());
+		_sender_params.code=http_code;
+		logger().debug("HTTP code set to %s", http_code);
+	}
+
 	_domainsFile=config().getString("domainlist","");
 	_urlsFile=config().getString("urllist","");
 	_sender_params.redirect_url=config().getString("redirect_url","");
