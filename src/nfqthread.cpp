@@ -45,8 +45,6 @@
 
 
 
-//#define OLD_DPI 1
-
 //#define DEBUG_EXCEPTION 1
 
 struct membuf : std::streambuf
@@ -334,9 +332,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		flow.reset((struct ndpi_flow_struct *)calloc(1,nfqFilter::ndpi_size_flow_struct));
 
 		uint32_t current_tickt = 0;
-#ifdef OLD_DPI
-		u_int32_t protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow, dpi_buf, size, current_tickt, src.get(), dst.get());
-#else
 		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow.get(), dpi_buf.get(), size, current_tickt, src.get(), dst.get());
 #if 0
 		// пробуем угадать протокол по портам...
@@ -355,14 +350,9 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		}
 #endif
 		self->_logger.debug("Protocol is %hu/%hu ",protocol.master_protocol,protocol.protocol);
-#endif
 		sw.stop();
 		self->_logger.debug("nDPI protocol detection occupied %ld us",sw.elapsed());
-#ifdef OLD_DPI
-		if(protocol == NDPI_PROTOCOL_SSL)
-#else
 		if(protocol.master_protocol == NDPI_PROTOCOL_SSL || protocol.protocol == NDPI_PROTOCOL_SSL)
-#endif
 		{
 			std::string ssl_client;
 			std::unique_ptr<Poco::Net::IPAddress> src_ip;
@@ -437,11 +427,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				return 0;
 			}
 		}
-#ifdef OLD_DPI
-		if(protocol != NDPI_PROTOCOL_HTTP)
-#else
 		if(protocol.master_protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_HTTP)
-#endif
 		{
 
 			std::unique_ptr<Poco::Net::IPAddress> src_ip;
@@ -485,21 +471,12 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					}
 				}
 			}
-
-
-#ifdef OLD_DPI
-			self->_logger.debug("Not http protocol. Protocol is %u from %s:%d to %s:%d",protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
-#else
 			self->_logger.debug("Not http protocol. Protocol is %hu/%hu from %s:%d to %s:%d",protocol.master_protocol,protocol.protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
-#endif
 			nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 			return 0;
 		};
 
 		self->_logger.debug("Got HTTP protocol");
-
-//		self->_logger.debug("Protocol %u/%s",protocol, protocol_name);
-
 		{
 			std::unique_ptr<Poco::Net::IPAddress> src_ip;
 			std::unique_ptr<Poco::Net::IPAddress> dst_ip;
