@@ -422,27 +422,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					return 0;
 				}
 			} else {
-				self->_logger.debug("No ssl client certificate found!");
-				nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
-				return 0;
-			}
-		}
-		if(protocol.master_protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_HTTP)
-		{
-
-			std::unique_ptr<Poco::Net::IPAddress> src_ip;
-			std::unique_ptr<Poco::Net::IPAddress> dst_ip;
-			if(ip_version == 4)
-			{
-				src_ip.reset(new Poco::Net::IPAddress(&iph->ip_src,sizeof(in_addr)));
-				dst_ip.reset(new Poco::Net::IPAddress(&iph->ip_dst,sizeof(in_addr)));
-			} else {
-				src_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_src,sizeof(in6_addr)));
-				dst_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_dst,sizeof(in6_addr)));
-			}
-			int tcp_src_port=ntohs(tcph->source);
-			int tcp_dst_port=ntohs(tcph->dest);
-			{
 				struct ndpi_packet_struct *packet_s = &(flow.get())->packet;
 				if(self->_config.block_undetected_ssl && flow->l4.tcp.ssl_stage >= 1)
 				{
@@ -470,6 +449,26 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						}
 					}
 				}
+				self->_logger.debug("No ssl client certificate found! Accept packet.");
+				nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
+				return 0;
+			}
+		}
+		if(protocol.master_protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_HTTP)
+		{
+			std::unique_ptr<Poco::Net::IPAddress> src_ip;
+			std::unique_ptr<Poco::Net::IPAddress> dst_ip;
+			if(ip_version == 4)
+			{
+				src_ip.reset(new Poco::Net::IPAddress(&iph->ip_src,sizeof(in_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph->ip_dst,sizeof(in_addr)));
+			} else {
+				src_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_src,sizeof(in6_addr)));
+				dst_ip.reset(new Poco::Net::IPAddress(&iph6->ip6_dst,sizeof(in6_addr)));
+			}
+			int tcp_src_port=ntohs(tcph->source);
+			int tcp_dst_port=ntohs(tcph->dest);
+			{
 			}
 			self->_logger.debug("Not http protocol. Protocol is %hu/%hu from %s:%d to %s:%d",protocol.master_protocol,protocol.protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 			nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
