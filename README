@@ -6,7 +6,36 @@
  libnetfilter_queue
  libnfnetlink
  Poco >= 1.6
- nDPI = 1.7
+ nDPI = 1.7 (работает корректно с версией https://sourceforge.net/projects/ntop/files/nDPI/nDPI-1.7.tar.gz/download , dev-ветки nDPI не работают с текущей версией nfqfilter)
+ Для данной версии nDPI необходимо применить следующий патч:
+
+diff -ruN nDPI-1.7/src/lib/protocols/ssl.c nDPI-1.7.new/src/lib/protocols/ssl.c
+--- nDPI-1.7/src/lib/protocols/ssl.c<-->2015-08-18 12:39:42.000000000 +0300
++++ nDPI-1.7.new/src/lib/protocols/ssl.c<------>2016-02-15 14:19:15.349618851 +0300
+@@ -288,8 +288,6 @@
+ int sslDetectProtocolFromCertificate(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
+   struct ndpi_packet_struct *packet = &flow->packet;
+.
+-  if(!packet->iph /* IPv4 */) return(-1);
+-
+   if((packet->payload_packet_len > 9)
+      && (packet->payload[0] == 0x16 /* consider only specific SSL packets (handshake) */)) {
+     if((packet->detected_protocol_stack[0] == NDPI_PROTOCOL_UNKNOWN)
+diff -ruN nDPI-1.7/src/lib/protocols/tor.c nDPI-1.7.new/src/lib/protocols/tor.c
+--- nDPI-1.7/src/lib/protocols/tor.c<-->2015-08-18 12:39:42.000000000 +0300
++++ nDPI-1.7.new/src/lib/protocols/tor.c<------>2016-02-15 14:18:56.373737121 +0300
+@@ -24,7 +24,7 @@
+.
+   if((certificate == NULL)
+      || (strlen(certificate) < 6)
+-     || strncmp(certificate, "www.", 4))
++     || !strncmp(certificate, "www.", 4))
+     return(0);
+.
+   // printf("***** [SSL] %s(): %s\n", __FUNCTION__, certificate);
+
+
+
 
 Для запуска программы необходимо указать путь к конфигурационному .ini файлу (-c в командой строке). Для запуска в режиме daemon необходимо указать ключи --daemon и --pidfile=/path/to/file.pid
 
