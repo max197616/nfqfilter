@@ -352,7 +352,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		self->_logger.debug("Protocol is %hu/%hu ",protocol.master_protocol,protocol.protocol);
 		sw.stop();
 		self->_logger.debug("nDPI protocol detection occupied %ld us",sw.elapsed());
-		if(protocol.master_protocol == NDPI_PROTOCOL_SSL || protocol.protocol == NDPI_PROTOCOL_SSL)
+		if(protocol.master_protocol == NDPI_PROTOCOL_SSL || protocol.protocol == NDPI_PROTOCOL_SSL || protocol.protocol == NDPI_PROTOCOL_TOR)
 		{
 			std::string ssl_client;
 			std::unique_ptr<Poco::Net::IPAddress> src_ip;
