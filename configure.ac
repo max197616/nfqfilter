@@ -6,7 +6,7 @@ AC_INIT(nfqfilter, 0.2, max1976@mail.ru)
 
 AM_INIT_AUTOMAKE()
 
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(no)])
 
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([include/config.h])
@@ -130,6 +130,47 @@ fi
 AC_CHECK_LIB([netfilter_queue], [nfq_open],,AC_MSG_ERROR([Netfilter_queue library not found!]))
 AC_CHECK_LIB([nfnetlink], [nfnl_fd],,AC_MSG_ERROR([Nfnetlink library not found!]))
 
-AC_CHECK_LIB([ndpi], [ndpi_init_detection_module],,AC_MSG_ERROR([nDPI library not found!]))
+dnl nDPI checks...
+NDPI_HOME=./nDPI
+AC_MSG_CHECKING(for nDPI $NDPI_HOME)
+if test -d "$NDPI_HOME" ; then :
+    AC_MSG_RESULT(found in $NDPI_HOME)
+else
+    AC_MSG_RESULT(not found)
+    AC_MSG_NOTICE(Getting nDPI from git)
+    git clone -b 1.7-stable https://github.com/ntop/nDPI.git $NDPI_HOME; cd $NDPI_HOME; patch -p1 < ../nDPI-1.7-bugfixes.patch  ; cd -
+    AC_MSG_CHECKING(for nDPI $NDPI_HOME)
+    if test -d "$NDPI_HOME" ; then :
+	AC_MSG_RESULT(found in $NDPI_HOME)
+    else
+	AC_MSG_ERROR(Install nDPI 1.7-stable: git clone -b 1.7-stable https://github.com/ntop/nDPI.git nDPI; cd $NDPI_HOME; patch -p1 < ../nDPI-1.7-bugfixes.patch; ./autogen.sh; make; cd - )
+    fi
+fi
+
+NDPI_LIB=$NDPI_HOME/src/lib/.libs/libndpi.a
+AC_MSG_CHECKING(for $NDPI_LIB)
+if test -f "$NDPI_LIB" ; then :
+
+else
+    AC_MSG_RESULT([not found, compiling...])
+    cd $NDPI_HOME; ./autogen.sh; make; cd -
+fi
+AC_MSG_RESULT(yes)
+
+save_flags="${CXXFLAGS}"
+CXXFLAGS="${CXXFLAGS} -I${NDPI_HOME}/src/include"
+AC_MSG_CHECKING(for compiling with nDPI)
+save_libs="${LIBS}"
+LIBS="$NDPI_LIB"
+AC_LINK_IFELSE(
+         [AC_LANG_PROGRAM(
+             [#include "ndpi_api.h"],
+             [ndpi_revision();]
+         )],
+         [LIBS="$save_libs"],
+         [AC_MSG_ERROR([Linking with nDPI failed!])]
+)
+AC_MSG_RESULT(yes)
+CXXFLAGS="$save_flags"
 
 AC_OUTPUT(Makefile src/Makefile include/Makefile)

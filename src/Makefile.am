@@ -1,6 +1,5 @@
-#CFLAGS = --pedantic -Wall -O2
-
-#CFLAGS = --pedantic -Wall -O2
+AM_CPPFLAGS = -I$(top_srcdir)/nDPI/src/include
+LDADD = $(top_srcdir)/nDPI/src/lib/.libs/libndpi.a
 
 bin_PROGRAMS = nfqfilter
 

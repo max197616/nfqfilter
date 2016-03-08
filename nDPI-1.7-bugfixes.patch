@@ -1,0 +1,44 @@
+diff -ruN 1.7-stable1/configure.ac 1.7-stable2/configure.ac
+--- 1.7-stable1/configure.ac	2016-03-08 21:06:41.166194736 +0300
++++ 1.7-stable2/configure.ac	2016-03-08 21:09:38.577277608 +0300
+@@ -1,6 +1,7 @@
+ AC_INIT([libndpi], [1.7.0])
+ 
+ AC_CONFIG_MACRO_DIR([m4])
++AC_CONFIG_AUX_DIR([.])
+ 
+ AM_INIT_AUTOMAKE([foreign subdir-objects])
+ 
+diff -ruN 1.7-stable1/src/lib/protocols/ssl.c 1.7-stable2/src/lib/protocols/ssl.c
+--- 1.7-stable1/src/lib/protocols/ssl.c	2016-03-08 21:06:41.507186738 +0300
++++ 1.7-stable2/src/lib/protocols/ssl.c	2016-03-08 21:10:19.809660495 +0300
+@@ -263,7 +263,7 @@
+ 		    len = (u_int)ndpi_min(extension_len-begin, buffer_len-1);
+ 		    strncpy(buffer, &server_name[begin], len);
+ 		    buffer[len] = '\0';
+-		    stripCertificateTrailer(buffer, buffer_len);
++//		    stripCertificateTrailer(buffer, buffer_len);
+ 
+ 		    snprintf(flow->protos.ssl.client_certificate,
+ 			     sizeof(flow->protos.ssl.client_certificate), "%s", buffer);
+@@ -288,8 +288,6 @@
+ int sslDetectProtocolFromCertificate(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
+   struct ndpi_packet_struct *packet = &flow->packet;
+ 
+-  if(!packet->iph /* IPv4 */) return(-1);
+-
+   if((packet->payload_packet_len > 9)
+      && (packet->payload[0] == 0x16 /* consider only specific SSL packets (handshake) */)) {
+     if((packet->detected_protocol_stack[0] == NDPI_PROTOCOL_UNKNOWN)
+diff -ruN 1.7-stable1/src/lib/protocols/tor.c 1.7-stable2/src/lib/protocols/tor.c
+--- 1.7-stable1/src/lib/protocols/tor.c	2016-03-08 21:06:41.511186645 +0300
++++ 1.7-stable2/src/lib/protocols/tor.c	2016-03-08 21:09:21.274540006 +0300
+@@ -24,7 +24,7 @@
+ 
+   if((certificate == NULL)
+      || (strlen(certificate) < 6)
+-     || strncmp(certificate, "www.", 4))
++     || !strncmp(certificate, "www.", 4))
+     return(0);
+ 
+   // printf("***** [SSL] %s(): %s\n", __FUNCTION__, certificate);

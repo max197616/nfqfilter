@@ -35,7 +35,7 @@
 #include <Poco/Net/IPAddress.h>
 #include "AhoCorasickPlus.h"
 
-#include <libndpi/ndpi_api.h>
+#include <ndpi_api.h>
 #include <memory>
 
 #include "sendertask.h"

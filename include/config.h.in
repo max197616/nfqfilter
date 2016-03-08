@@ -3,9 +3,6 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
-/* Define to 1 if you have the `ndpi' library (-lndpi). */
-#undef HAVE_LIBNDPI
-
 /* Define to 1 if you have the `netfilter_queue' library (-lnetfilter_queue).
    */
 #undef HAVE_LIBNETFILTER_QUEUE

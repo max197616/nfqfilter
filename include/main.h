@@ -32,7 +32,7 @@
 #include <Poco/HashMap.h>
 #include <Poco/ErrorHandler.h>
 #include <set>
-#include <libndpi/ndpi_api.h>
+#include <ndpi_api.h>
 #include "sender.h"
 #include "nfqthread.h"
 
