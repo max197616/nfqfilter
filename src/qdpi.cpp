@@ -80,7 +80,7 @@ struct ndpi_detection_module_struct* init_ndpi()
 		return NULL;
 	}
 
-	my_ndpi_struct->http_dont_dissect_response=1; // не ждем ответа http для разбора!!!
+//	my_ndpi_struct->http_dont_dissect_response=1;
 
 	NDPI_PROTOCOL_BITMASK all;
 	// enable all protocols

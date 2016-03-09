@@ -1,6 +1,6 @@
-diff -ruN 1.7-stable1/configure.ac 1.7-stable2/configure.ac
---- 1.7-stable1/configure.ac	2016-03-08 21:06:41.166194736 +0300
-+++ 1.7-stable2/configure.ac	2016-03-08 21:09:38.577277608 +0300
+diff -ruN nDPI.orig/configure.ac nDPI/configure.ac
+--- nDPI.orig/configure.ac	2016-03-09 22:13:19.098325729 +0300
++++ nDPI/configure.ac	2016-03-09 22:13:41.017357878 +0300
 @@ -1,6 +1,7 @@
  AC_INIT([libndpi], [1.7.0])
  
@@ -9,9 +9,29 @@ diff -ruN 1.7-stable1/configure.ac 1.7-stable2/configure.ac
  
  AM_INIT_AUTOMAKE([foreign subdir-objects])
  
-diff -ruN 1.7-stable1/src/lib/protocols/ssl.c 1.7-stable2/src/lib/protocols/ssl.c
---- 1.7-stable1/src/lib/protocols/ssl.c	2016-03-08 21:06:41.507186738 +0300
-+++ 1.7-stable2/src/lib/protocols/ssl.c	2016-03-08 21:10:19.809660495 +0300
+diff -ruN nDPI.orig/src/lib/protocols/http.c nDPI/src/lib/protocols/http.c
+--- nDPI.orig/src/lib/protocols/http.c	2016-03-09 22:13:19.105326058 +0300
++++ nDPI/src/lib/protocols/http.c	2016-03-09 22:14:06.426559272 +0300
+@@ -241,13 +241,12 @@
+     if((flow->http.url == NULL)
+        && (packet->http_url_name.len > 0)
+        && (packet->host_line.len > 0)) {
+-      int len = packet->http_url_name.len + packet->host_line.len + 7 + 1; /* "http://" */
++      int len = packet->http_url_name.len + packet->host_line.len + 1;
+ 
+       flow->http.url = ndpi_malloc(len);
+       if(flow->http.url) {
+-	strncpy(flow->http.url, "http://", 7);
+-	strncpy(&flow->http.url[7], (char*)packet->host_line.ptr, packet->host_line.len);
+-	strncpy(&flow->http.url[7+packet->host_line.len], (char*)packet->http_url_name.ptr, 
++	strncpy(flow->http.url, (char*)packet->host_line.ptr, packet->host_line.len);
++	strncpy(&flow->http.url[packet->host_line.len], (char*)packet->http_url_name.ptr, 
+ 		packet->http_url_name.len);
+ 	flow->http.url[len-1] = '\0';
+       }
+diff -ruN nDPI.orig/src/lib/protocols/ssl.c nDPI/src/lib/protocols/ssl.c
+--- nDPI.orig/src/lib/protocols/ssl.c	2016-03-09 22:13:19.108326199 +0300
++++ nDPI/src/lib/protocols/ssl.c	2016-03-09 22:13:41.017357878 +0300
 @@ -263,7 +263,7 @@
  		    len = (u_int)ndpi_min(extension_len-begin, buffer_len-1);
  		    strncpy(buffer, &server_name[begin], len);
@@ -30,9 +50,9 @@ diff -ruN 1.7-stable1/src/lib/protocols/ssl.c 1.7-stable2/src/lib/protocols/ssl.
    if((packet->payload_packet_len > 9)
       && (packet->payload[0] == 0x16 /* consider only specific SSL packets (handshake) */)) {
      if((packet->detected_protocol_stack[0] == NDPI_PROTOCOL_UNKNOWN)
-diff -ruN 1.7-stable1/src/lib/protocols/tor.c 1.7-stable2/src/lib/protocols/tor.c
---- 1.7-stable1/src/lib/protocols/tor.c	2016-03-08 21:06:41.511186645 +0300
-+++ 1.7-stable2/src/lib/protocols/tor.c	2016-03-08 21:09:21.274540006 +0300
+diff -ruN nDPI.orig/src/lib/protocols/tor.c nDPI/src/lib/protocols/tor.c
+--- nDPI.orig/src/lib/protocols/tor.c	2016-03-09 22:13:19.109326246 +0300
++++ nDPI/src/lib/protocols/tor.c	2016-03-09 22:13:41.018357925 +0300
 @@ -24,7 +24,7 @@
  
    if((certificate == NULL)

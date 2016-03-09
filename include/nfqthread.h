@@ -40,7 +40,6 @@ struct nfqConfig
 	bool lower_host;
 	bool match_host_exactly;
 	enum ADD_P_TYPES add_p_type;
-	bool guess_protocol;
 };
 
 struct threadStats

@@ -73,7 +73,6 @@ void nfqFilter::initialize(Application& self)
 	_config.save_exception_dump=config().getBool("save_bad_packets",false);
 	_config.lower_host=config().getBool("lower_host",false);
 	_config.match_host_exactly=config().getBool("match_host_exactly",false);
-	_config.guess_protocol=config().getBool("guess_protocol",false);
 
 	std::string add_p_type=config().getString("url_additional_info","none");
 	std::transform(add_p_type.begin(), add_p_type.end(), add_p_type.begin(), ::tolower);

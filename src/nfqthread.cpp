@@ -333,7 +333,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 		uint32_t current_tickt = 0;
 		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow.get(), dpi_buf.get(), size, current_tickt, src.get(), dst.get());
-		if(self->_config.guess_protocol && protocol.protocol == NDPI_PROTOCOL_UNKNOWN)
+		if(protocol.protocol == NDPI_PROTOCOL_UNKNOWN)
 		{
 			self->_logger.debug("Guessing protocol...");
 			int tcp_src_port=ntohs(tcph->source);
@@ -487,6 +487,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			int tcp_src_port=ntohs(tcph->source);
 			int tcp_dst_port=ntohs(tcph->dest);
 
+/*
 			Poco::Net::HTTPRequest request;
 			membuf sbuf((char*)full_packet+(ip_version == 4 ? sizeof(struct ip) : sizeof(struct ip6_hdr))+(4*tcph->doff), (char*)full_packet+(ip_version == 4 ? sizeof(struct ip) : sizeof(struct ip6_hdr))+(4*tcph->doff)+size - (tcph->doff*4) - (ip_version == 4 ? sizeof(struct ip) : sizeof(struct ip6_hdr)));
 			std::istream in(&sbuf);
@@ -518,11 +519,10 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 				nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 				return 0;
 			}
-			try
+*/
+			std::string host((char *)&flow->host_server_name[0]);
+			if(flow->http.method == HTTP_METHOD_GET || flow->http.method == HTTP_METHOD_POST || flow->http.method == HTTP_METHOD_HEAD && !host.empty())
 			{
-			if((request.getMethod() == Poco::Net::HTTPRequest::HTTP_GET || request.getMethod() == Poco::Net::HTTPRequest::HTTP_POST || request.getMethod() == Poco::Net::HTTPRequest::HTTP_HEAD) && !request.getHost().empty())
-			{
-				std::string host(request.getHost());
 				if(host[host.length()-1] == '.')
 				{
 					host.erase(host.length()-1,1);
@@ -576,35 +576,39 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					}
 				}
 				{
+					
 					sw.reset();
 					sw.start();
-					Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
-					std::string uri(host+request.getURI());
-					nfqFilter::atm->search(uri,false);
-					AhoCorasickPlus::Match match;
 					bool found=false;
-					while(nfqFilter::atm->findNext(match) && !found)
+					std::string uri(flow->http.url ? flow->http.url : "");
+					AhoCorasickPlus::Match match;
+					if(flow->http.url)
 					{
-						found=true;
-						DomainsMap::Iterator it=nfqFilter::_domainsUrlsMap.find(match.id);
-						if(it != nfqFilter::_domainsUrlsMap.end())
+						Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
+						nfqFilter::atm->search(uri,false);
+						while(nfqFilter::atm->findNext(match) && !found)
 						{
-							if(self->_config.match_host_exactly)
+							found=true;
+							DomainsMap::Iterator it=nfqFilter::_domainsUrlsMap.find(match.id);
+							if(it != nfqFilter::_domainsUrlsMap.end())
 							{
-								if(it->second != host)
-									found = false;
-							} else {
-								if(it->second != host)
+								if(self->_config.match_host_exactly)
 								{
-									std::size_t pos = host.find(it->second);
-									if(pos != std::string::npos)
-									{
-										std::string str1 = host.substr(0,pos);
-										// это не тот домен, который нужен
-										if(str1[str1.size()-1] != '.')
-											found = false;
-									} else {
+									if(it->second != host)
 										found = false;
+								} else {
+									if(it->second != host)
+									{
+										std::size_t pos = host.find(it->second);
+										if(pos != std::string::npos)
+										{
+											std::string str1 = host.substr(0,pos);
+											// это не тот домен, который нужен
+											if(str1[str1.size()-1] != '.')
+												found = false;
+										} else {
+											found = false;
+										}
 									}
 								}
 							}
@@ -612,6 +616,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					}
 					sw.stop();
 					self->_logger.debug("URL seek occupied %ld us for uri %s",sw.elapsed(),uri);
+
 					if(found)
 					{
 						self->_logger.debug("URL %s present in url (file pos %u) list from ip %s",uri,match.id,src_ip->toString());
@@ -632,24 +637,6 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						
 					}
 				}
-			}
-			} catch (Poco::NotFoundException &excep)
-			{
-				self->_logger.warning("Got exсeption: not found key %s",excep.message());
-				if(self->_config.save_exception_dump)
-				{
-					time_t ttm=time(NULL);
-					std::string s=std::to_string(ttm);
-					Poco::FileOutputStream pdump("/tmp/packet_dump_exception-"+s+"-"+src_ip->toString(),std::ios::binary);
-					for(int i=0; i < size; i++)
-					{
-						pdump << (unsigned char) full_packet[i];
-					}
-					pdump.close();
-				}
-			} catch (Poco::Exception &excep)
-			{
-				self->_logger.warning("Got exception: %s",excep.message());
 			}
 		}
 		nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
