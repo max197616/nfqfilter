@@ -200,7 +200,7 @@ void nfqThread::runTask()
 				case ECONNRESET:
 					_logger.error("ERROR: ECONNRESET: NFQ socket connection reset"); break;
 				case ETIMEDOUT:
-					_logger.error("ERROR: ETIMEDOUT: NFQ soeckt connection timedout"); break;
+					_logger.error("ERROR: ETIMEDOUT: NFQ socket connection timedout"); break;
 				case ENOBUFS:
 					_logger.error("ERROR: ENOBUFS: Application is not fast enough. Increase socket buffer size by nfnl_rcvbufsize()"); break;
 				default:
@@ -333,22 +333,18 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 		uint32_t current_tickt = 0;
 		ndpi_protocol protocol = ndpi_detection_process_packet(nfqFilter::my_ndpi_struct, flow.get(), dpi_buf.get(), size, current_tickt, src.get(), dst.get());
-#if 0
-		// пробуем угадать протокол по портам...
-		if(protocol.protocol == NDPI_PROTOCOL_UNKNOWN)
+		if(self->_config.guess_protocol && protocol.protocol == NDPI_PROTOCOL_UNKNOWN)
 		{
+			self->_logger.debug("Guessing protocol...");
 			int tcp_src_port=ntohs(tcph->source);
 			int tcp_dst_port=ntohs(tcph->dest);
-			self->_logger.information("Guessing protocol...");
 			protocol = ndpi_guess_undetected_protocol(nfqFilter::my_ndpi_struct,
-							   (ip_version == 4 ? iph->ip_id : iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt),
-							   0,//ip
-							   tcp_src_port, // sport
-							   0,
-							   tcp_dst_port); // dport
-
+				   (ip_version == 4 ? iph->ip_p : iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt),
+				   0,//ip
+				   tcp_src_port, // sport
+				   0,
+				   tcp_dst_port); // dport
 		}
-#endif
 		self->_logger.debug("Protocol is %hu/%hu ",protocol.master_protocol,protocol.protocol);
 		sw.stop();
 		self->_logger.debug("nDPI protocol detection occupied %ld us",sw.elapsed());
