@@ -45,7 +45,7 @@
 typedef Poco::HashMap<unsigned int, std::string> DomainsMap;
 typedef Poco::HashMap<std::string,int> UrlsMap;
 
-typedef Poco::HashMap<int,std::set<unsigned short>> IPPortMap;
+typedef std::map<Poco::Net::IPAddress,std::set<unsigned short>> IPPortMap;
 
 class AhoCorasickPlus;
 

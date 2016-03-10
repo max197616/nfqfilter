@@ -277,9 +277,8 @@ void nfqFilter::initialize(Application& self)
 					} else {
 						logger().debug("IP %s without port", ip);
 					}
-					struct in_addr _ip;
-					inet_pton(AF_INET, ip.c_str(), &_ip);
-					IPPortMap::Iterator it=_ipportMap.find(_ip.s_addr);
+					Poco::Net::IPAddress ip_addr(ip);
+					IPPortMap::iterator it=_ipportMap.find(ip_addr);
 					if(it == _ipportMap.end())
 					{
 						std::set<unsigned short> ports;
@@ -288,7 +287,7 @@ void nfqFilter::initialize(Application& self)
 							logger().debug("Adding port %s to ip %s", port, ip);
 							ports.insert(porti);
 						}
-						_ipportMap.insert(IPPortMap::ValueType(_ip.s_addr,ports));
+						_ipportMap.insert(std::make_pair(ip_addr,ports));
 						logger().debug("Inserted ip: %s from line %d", ip, lineno);
 					} else {
 						logger().debug("Adding port %s from line %d to ip %s", port,lineno,ip);
