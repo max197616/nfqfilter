@@ -415,22 +415,25 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						u_int8_t handshake_protocol = packet_s->payload[5]; /* handshake protocol a bit misleading, it is message type according TLS specs */
 						if(handshake_protocol == 0x01 /* Client Hello */)
 						{
-							self->_logger.debug("Blocking/Marking SSL client hello packet from %s to %s", src_ip->toString(), dst_ip->toString());
-							if(self->_config.send_rst)
+							if(nfqFilter::_sslIpsSet.find(*dst_ip.get()) != nfqFilter::_sslIpsSet.end())
 							{
-								self->_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
-								std::string empty_str;
-								SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
-								Poco::Mutex::ScopedLock lock(self->_statsMutex);
-								self->_stats.sended_rst++;
-								nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
-							} else {
-								self->_logger.debug("SSLClientHello: Set mark %d to packet no %d",self->_config.mark_value,id);
-								Poco::Mutex::ScopedLock lock(self->_statsMutex);
-								self->_stats.marked_ssl++;
-								nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
+								self->_logger.debug("Blocking/Marking SSL client hello packet from %s to %s", src_ip->toString(), dst_ip->toString());
+								if(self->_config.send_rst)
+								{
+									self->_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+									std::string empty_str;
+									SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+									Poco::Mutex::ScopedLock lock(self->_statsMutex);
+									self->_stats.sended_rst++;
+									nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
+								} else {
+									self->_logger.debug("SSLClientHello: Set mark %d to packet no %d",self->_config.mark_value,id);
+									Poco::Mutex::ScopedLock lock(self->_statsMutex);
+									self->_stats.marked_ssl++;
+									nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
+								}
+								return 0;
 							}
-							return 0;
 						}
 					}
 				}

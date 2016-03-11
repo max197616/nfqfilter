@@ -47,6 +47,8 @@ typedef Poco::HashMap<std::string,int> UrlsMap;
 
 typedef std::map<Poco::Net::IPAddress,std::set<unsigned short>> IPPortMap;
 
+typedef std::set<Poco::Net::IPAddress> SSLIps;
+
 class AhoCorasickPlus;
 
 class nfqFilter: public Poco::Util::ServerApplication
@@ -62,6 +64,7 @@ public:
 	static DomainsMap _domainsSSLMap;
 
 	static IPPortMap _ipportMap;
+	static SSLIps    _sslIpsSet;
 
 	static Poco::Mutex _urlMapMutex;
 

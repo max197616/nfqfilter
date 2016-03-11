@@ -31,6 +31,7 @@ DomainsMap nfqFilter::_domainsUrlsMap;
 DomainsMap nfqFilter::_domainsSSLMap;
 
 IPPortMap nfqFilter::_ipportMap;
+SSLIps    nfqFilter::_sslIpsSet;
 
 Poco::Mutex nfqFilter::_urlMapMutex;
 
@@ -105,7 +106,7 @@ void nfqFilter::initialize(Application& self)
 	std::string _sslFile=config().getString("ssllist","");
 	_statistic_interval=config().getInt("statistic_interval",0);
 
-
+	std::string _sslIpsFile=config().getString("sslips","");
 
 
 	std::string _hostsFile=config().getString("hostlist","");
@@ -294,6 +295,32 @@ void nfqFilter::initialize(Application& self)
 						it->second.insert(porti);
 					}
 					
+				}
+				lineno++;
+			}
+		} else
+			throw Poco::OpenFileException(_hostsFile);
+		hf.close();
+	}
+	if(!_sslIpsFile.empty())
+	{
+		Poco::FileInputStream hf(_sslIpsFile);
+		if(hf.good())
+		{
+			int lineno=1;
+			while(!hf.eof())
+			{
+				std::string str;
+				getline(hf,str);
+				if(!str.empty())
+				{
+					std::pair<SSLIps::iterator,bool> ret;
+					Poco::Net::IPAddress ip_addr(str);
+					ret=_sslIpsSet.insert(ip_addr);
+					if(ret.second == false)
+					{
+						logger().information("IP address %s already present at ssl ips list", ip_addr.toString());
+					}
 				}
 				lineno++;
 			}
