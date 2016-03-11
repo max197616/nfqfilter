@@ -2,7 +2,10 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT(nfqfilter, 0.2, max1976@mail.ru)
+AC_INIT(nfqfilter, 0.3, max1976@mail.ru)
+
+NDPI_HOME=./nDPI
+NDPI_GIT_VERSION=1.7-stable
 
 AM_INIT_AUTOMAKE()
 
@@ -131,19 +134,18 @@ AC_CHECK_LIB([netfilter_queue], [nfq_open],,AC_MSG_ERROR([Netfilter_queue librar
 AC_CHECK_LIB([nfnetlink], [nfnl_fd],,AC_MSG_ERROR([Nfnetlink library not found!]))
 
 dnl nDPI checks...
-NDPI_HOME=./nDPI
 AC_MSG_CHECKING(for nDPI $NDPI_HOME)
 if test -d "$NDPI_HOME" ; then :
     AC_MSG_RESULT(found in $NDPI_HOME)
 else
     AC_MSG_RESULT(not found)
     AC_MSG_NOTICE(Getting nDPI from git)
-    git clone -b 1.7-stable https://github.com/ntop/nDPI.git $NDPI_HOME; cd $NDPI_HOME; patch -p1 < ../nDPI-1.7-bugfixes.patch  ; cd -
+    git clone -b $NDPI_GIT_VERSION https://github.com/ntop/nDPI.git $NDPI_HOME; cd $NDPI_HOME; patch -p1 < ../nDPI-1.7-bugfixes.patch ; cd -
     AC_MSG_CHECKING(for nDPI $NDPI_HOME)
     if test -d "$NDPI_HOME" ; then :
 	AC_MSG_RESULT(found in $NDPI_HOME)
     else
-	AC_MSG_ERROR(Install nDPI 1.7-stable: git clone -b 1.7-stable https://github.com/ntop/nDPI.git nDPI; cd $NDPI_HOME; patch -p1 < ../nDPI-1.7-bugfixes.patch; ./autogen.sh; make; cd - )
+	AC_MSG_ERROR(Install nDPI 1.7-stable: git clone -b $NDPI_GIT_VERSION https://github.com/ntop/nDPI.git $NDPI_HOME; cd $NDPI_HOME; patch -p1 < ../nDPI-1.7-bugfixes.patch ; ./autogen.sh; make; cd - )
     fi
 fi
 

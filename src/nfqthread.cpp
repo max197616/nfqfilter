@@ -292,35 +292,29 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 		uint8_t ip_protocol=(ip_version == 4 ? iph->ip_p : iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt);
 
-		if(ip_version == 4)
+		IPPortMap::iterator it_ip=nfqFilter::_ipportMap.find(*dst_ip.get());
+		if(it_ip != nfqFilter::_ipportMap.end())
 		{
-			// проверяем из списка hosts ipv4...
-			IPPortMap::iterator it_ip=nfqFilter::_ipportMap.find(*dst_ip.get());
-			if(it_ip != nfqFilter::_ipportMap.end())
+			unsigned short port=tcp_dst_port;
+			if (it_ip->second.size() == 0 || it_ip->second.find(port) != it_ip->second.end())
 			{
-				unsigned short port=tcp_dst_port;
-				if (it_ip->second.size() == 0 || it_ip->second.find(port) != it_ip->second.end())
+				if(self->_config.send_rst)
 				{
-					if(self->_config.send_rst)
-					{
-						self->_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
-						std::string empty_str;
-						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
-						Poco::Mutex::ScopedLock lock(self->_statsMutex);
-						self->_stats.sended_rst++;
-						nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
-					} else {
-						self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_config.mark_value,id,port);
-						Poco::Mutex::ScopedLock lock(self->_statsMutex);
-						self->_stats.marked_hosts++;
-						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
-					}
-					return 0;
+					self->_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+					std::string empty_str;
+					SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+					Poco::Mutex::ScopedLock lock(self->_statsMutex);
+					self->_stats.sended_rst++;
+					nfq_set_verdict(self->qh,id,NF_DROP,0,NULL);
+				} else {
+					self->_logger.debug("HostList: Set mark %d to packet no %d  port %hu",self->_config.mark_value,id,port);
+					Poco::Mutex::ScopedLock lock(self->_statsMutex);
+					self->_stats.marked_hosts++;
+					nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
 				}
+				return 0;
 			}
 		}
-		// todo: добавить поиск по ipv6
-
 		// nDPI usage
 		sw.reset();
 		sw.start();
