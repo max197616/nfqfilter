@@ -488,9 +488,11 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			std::string host((char *)&flow->host_server_name[0]);
 			if(flow->http.method == HTTP_METHOD_GET || flow->http.method == HTTP_METHOD_POST || flow->http.method == HTTP_METHOD_HEAD && !host.empty())
 			{
+				int dot_del=0;
 				if(host[host.length()-1] == '.')
 				{
-					host.erase(host.length()-1,1);
+					dot_del=host.length()-1;
+					host.erase(dot_del,1);
 				}
 				{
 					if(self->_config.lower_host)
@@ -549,6 +551,8 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					AhoCorasickPlus::Match match;
 					if(flow->http.url)
 					{
+						if(dot_del)
+							uri.erase(dot_del,1);
 						Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 						nfqFilter::atm->search(uri,false);
 						while(nfqFilter::atm->findNext(match) && !found)
