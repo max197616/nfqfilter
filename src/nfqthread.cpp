@@ -25,8 +25,6 @@
 #include <netinet/tcp.h>
 #include <linux/netfilter.h>
 #include <istream>
-#include <streambuf>
-#include <sstream>
 
 #include "nfqthread.h"
 #include "main.h"
@@ -225,8 +223,8 @@ static char from_hex(char ch)
 static std::string url_decode(std::string text)
 {
 	char h;
-	std::ostringstream escaped;
-	escaped.fill('0');
+	std::string escaped;
+	escaped.reserve(text.length());
 	for (auto i = text.begin(), n = text.end(); i != n; ++i)
 	{
 		std::string::value_type c = (*i);
@@ -237,17 +235,17 @@ static std::string url_decode(std::string text)
 				h = from_hex(i[1]) << 4 | from_hex(i[2]);
 				if((h >= '0' && h <= '9') || ( h >= 'a' && h <= 'z') || ( h >= 'A' && h <= 'Z'))
 				{
-					escaped << h;
+					escaped += h;
 					i += 2;
 				} else {
-					escaped << c;
+					escaped += c;
 				}
 			}
 		} else {
-			escaped << c;
+			escaped += c;
 		}
 	}
-	return escaped.str();
+	return escaped;
 }
 
 
