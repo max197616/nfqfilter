@@ -553,6 +553,8 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 					{
 						if(dot_del)
 							uri.erase(dot_del,1);
+						if(self->_config.lower_host)
+							uri.replace(0,host.length(),host);
 						Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 						nfqFilter::atm->search(uri,false);
 						while(nfqFilter::atm->findNext(match) && !found)
