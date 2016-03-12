@@ -39,6 +39,7 @@ struct nfqConfig
 	bool block_undetected_ssl;
 	bool lower_host;
 	bool match_host_exactly;
+	bool url_decode;
 	enum ADD_P_TYPES add_p_type;
 };
 

@@ -26,6 +26,7 @@
 #include <linux/netfilter.h>
 #include <istream>
 #include <streambuf>
+#include <sstream>
 
 #include "nfqthread.h"
 #include "main.h"
@@ -215,6 +216,40 @@ void nfqThread::runTask()
 		free(buf);
 	_logger.debug("Destroing queue %d",_config.queueNumber);
 }
+
+static char from_hex(char ch)
+{
+	return isdigit(ch) ? ch - '0' : tolower(ch) - 'a' + 10;
+}
+
+static std::string url_decode(std::string text)
+{
+	char h;
+	std::ostringstream escaped;
+	escaped.fill('0');
+	for (auto i = text.begin(), n = text.end(); i != n; ++i)
+	{
+		std::string::value_type c = (*i);
+		if (c == '%')
+		{
+			if (i[1] && i[2])
+			{
+				h = from_hex(i[1]) << 4 | from_hex(i[2]);
+				if((h >= '0' && h <= '9') || ( h >= 'a' && h <= 'z') || ( h >= 'A' && h <= 'Z'))
+				{
+					escaped << h;
+					i += 2;
+				} else {
+					escaped << c;
+				}
+			}
+		} else {
+			escaped << c;
+		}
+	}
+	return escaped.str();
+}
+
 
 
 int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
@@ -555,6 +590,8 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 							uri.erase(dot_del,1);
 						if(self->_config.lower_host)
 							uri.replace(0,host.length(),host);
+						if(self->_config.url_decode)
+							uri=url_decode(uri);
 						Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 						nfqFilter::atm->search(uri,false);
 						while(nfqFilter::atm->findNext(match) && !found)
