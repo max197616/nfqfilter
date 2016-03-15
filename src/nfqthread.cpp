@@ -438,6 +438,9 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						nfq_set_verdict2(self->qh,id,NF_ACCEPT,self->_config.mark_value,0,NULL);
 					}
 					return 0;
+				} else {
+					nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
+					return 0;
 				}
 			} else {
 				struct ndpi_packet_struct *packet_s = &flow->packet;
@@ -450,7 +453,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						{
 							if(nfqFilter::_sslIpsSet.find(*dst_ip.get()) != nfqFilter::_sslIpsSet.end())
 							{
-								self->_logger.debug("Blocking/Marking SSL client hello packet from %s to %s", src_ip->toString(), dst_ip->toString());
+								self->_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 								if(self->_config.send_rst)
 								{
 									self->_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
@@ -470,7 +473,7 @@ int nfqThread::nfqueue_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 						}
 					}
 				}
-				self->_logger.debug("No ssl client certificate found! Accept packet.");
+				self->_logger.debug("No ssl client certificate found! Accept packet from %s:%d to %s:%d.",src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 				nfq_set_verdict(self->qh,id,NF_ACCEPT,0,NULL);
 				return 0;
 			}
