@@ -111,7 +111,7 @@ protected:
 	void initialize(Application& self);
 	void uninitialize();
 	void defineOptions(Poco::Util::OptionSet& options);
-	void handleOptions(const std::string& name,const std::string& value);
+	void handleOption(const std::string& name,const std::string& value);
 	void handleHelp(const std::string& name,const std::string& value);
 	void displayHelp();
 	int main(const ArgVec& args);
@@ -124,6 +124,9 @@ private:
 	std::string _protocolsFile;
 	int _statistic_interval;
 	struct nfqConfig _config;
+
+	int _cmd_queueNum;
+	int _cmd_threadsNum;
 
 	ErrorHandler _errorHandler;
 	struct CSender::params _sender_params;

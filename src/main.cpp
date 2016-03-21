@@ -18,6 +18,7 @@
 */
 
 #include <iostream>
+#include <Poco/NumberParser.h>
 #include "main.h"
 #include "nfqstatistictask.h"
 #include "qdpi.h"
@@ -52,7 +53,11 @@ AhoCorasickPlus *nfqFilter::atm_domains=NULL;
 
 std::map<std::string, ADD_P_TYPES> add_type_s;
 
-nfqFilter::nfqFilter(): _helpRequested(false),_errorHandler(*this)
+nfqFilter::nfqFilter():
+	_helpRequested(false),
+	_errorHandler(*this),
+	_cmd_queueNum(-1),
+	_cmd_threadsNum(-1)
 {
 	Poco::ErrorHandler::set(&_errorHandler);
 }
@@ -66,7 +71,12 @@ void nfqFilter::initialize(Application& self)
 	loadConfiguration();
 	ServerApplication::initialize(self);
 
-	_config.queueNumber=config().getInt("queue",0);
+	if(_cmd_queueNum > 0)
+	{
+		_config.queueNumber=_cmd_queueNum;
+	} else {
+		_config.queueNumber=config().getInt("queue",0);
+	}
 	_config.max_pending_packets=config().getInt("max_pending_packets",DEFAULT_MAX_PENDING_PACKETS);
 	_config.send_rst=config().getBool("send_rst", false);
 	_config.mark_value=config().getInt("mark_value",MARK_VALUE);
@@ -75,6 +85,15 @@ void nfqFilter::initialize(Application& self)
 	_config.lower_host=config().getBool("lower_host",false);
 	_config.match_host_exactly=config().getBool("match_host_exactly",false);
 	_config.url_decode=config().getBool("url_decode",false);
+
+	if(_cmd_threadsNum > 0 && _cmd_threadsNum <= 16)
+	{
+		_config.num_threads=_cmd_threadsNum;
+	} else {
+		_config.num_threads=config().getInt("num_threads",2);
+		if(_config.num_threads > 16)
+			_config.num_threads=16;
+	}
 
 	std::string add_p_type=config().getString("url_additional_info","none");
 	std::transform(add_p_type.begin(), add_p_type.end(), add_p_type.begin(), ::tolower);
@@ -356,7 +375,7 @@ void nfqFilter::uninitialize()
 
 void nfqFilter::defineOptions(Poco::Util::OptionSet& options)
 {
-	Poco::Util::ServerApplication::defineOptions(options);
+	ServerApplication::defineOptions(options);
 	options.addOption(
 		Poco::Util::Option("help","h","display help on command line arguments")
 			.required(false)
@@ -366,15 +385,35 @@ void nfqFilter::defineOptions(Poco::Util::OptionSet& options)
 		Poco::Util::Option("config_file","c","specify config file to read")
 			.required(true)
 			.repeatable(false)
-			.argument("file")
-			.callback(Poco::Util::OptionCallback<nfqFilter>(this,&nfqFilter::handleOptions)));
+			.argument("file"));
+	options.addOption(
+		Poco::Util::Option("queue","q","specify queue number")
+			.required(false)
+			.repeatable(false)
+			.argument("queue_num"));
+
+	options.addOption(
+		Poco::Util::Option("threads","t","specify number of running threads")
+			.required(false)
+			.repeatable(false)
+			.argument("threads_num"));
+
 }
 
-void nfqFilter::handleOptions(const std::string& name,const std::string& value)
+void nfqFilter::handleOption(const std::string& name,const std::string& value)
 {
+	ServerApplication::handleOption(name, value);
 	if(name == "config_file")
 	{
 		loadConfiguration(value);
+	}
+	if(name == "queue")
+	{
+		_cmd_queueNum = Poco::NumberParser::parse(value);
+	}
+	if(name == "threads")
+	{
+		_cmd_threadsNum = Poco::NumberParser::parse(value);
 	}
 }
 
