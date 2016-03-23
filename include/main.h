@@ -59,12 +59,15 @@ public:
 	~nfqFilter();
 
 	static Poco::Mutex _domainMapMutex;
-	static DomainsMap _domainsMap;
-	static DomainsMap _domainsUrlsMap;
-	static DomainsMap _domainsSSLMap;
+	static DomainsMap *_domainsMap;
+	static DomainsMap *_domainsUrlsMap;
+	static DomainsMap *_domainsSSLMap;
 
-	static IPPortMap _ipportMap;
-	static SSLIps    _sslIpsSet;
+	static Poco::Mutex _ipportMapMutex;
+	static IPPortMap *_ipportMap;
+
+	static Poco::Mutex _sslIpsSetMutex;
+	static SSLIps    *_sslIpsSet;
 
 	static Poco::Mutex _urlMapMutex;
 
@@ -80,6 +83,35 @@ public:
 	static AhoCorasickPlus *atm_ssl;
 	static AhoCorasickPlus *atm_domains;
 
+	std::string &getSSLFile()
+	{
+		return _sslFile;
+	}
+
+	std::string &getDomainsFile()
+	{
+		return _domainsFile;
+	}
+
+	std::string &getURLsFile()
+	{
+		return _urlsFile;
+	}
+
+	std::string &getHostsFile()
+	{
+	    return _hostsFile;
+	}
+
+	std::string &getSSLIpsFile()
+	{
+		return _sslIpsFile;
+	}
+
+	void loadDomains(std::string &fn, AhoCorasickPlus *_dm_atm,DomainsMap *_dm_map);
+	void loadURLs(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap *dm_map);
+	void loadHosts(std::string &fn,IPPortMap *ippm);
+	void loadSSLIP(std::string &fn, SSLIps *sslips);
 protected:
 	class ErrorHandler: public Poco::ErrorHandler
 	{
@@ -122,6 +154,9 @@ private:
 	std::string _domainsFile;
 	std::string _urlsFile;
 	std::string _protocolsFile;
+	std::string _sslFile;
+	std::string _hostsFile;
+	std::string _sslIpsFile;
 	int _statistic_interval;
 	struct nfqConfig _config;
 

@@ -164,27 +164,33 @@ void PktAnalyzer::analyzer(Packet &pkt)
 
 	uint8_t ip_protocol=(ip_version == 4 ? iph->ip_p : iph6->ip6_ctlun.ip6_un1.ip6_un1_nxt);
 
-	IPPortMap::iterator it_ip=nfqFilter::_ipportMap.find(*dst_ip.get());
-	if(it_ip != nfqFilter::_ipportMap.end())
+
 	{
-		unsigned short port=tcp_dst_port;
-		if (it_ip->second.size() == 0 || it_ip->second.find(port) != it_ip->second.end())
+		Poco::Mutex::ScopedLock lock(nfqFilter::_ipportMapMutex);
+		IPPortMap::iterator it_ip=nfqFilter::_ipportMap->find(*dst_ip.get());
+		if(it_ip != nfqFilter::_ipportMap->end())
 		{
-			if(_config.send_rst)
+			unsigned short port=tcp_dst_port;
+			if (it_ip->second.size() == 0 || it_ip->second.find(port) != it_ip->second.end())
 			{
-				_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
-				std::string empty_str;
-				SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
-				_parent->inc_sended_rst();
-				nfq_set_verdict(qh,id,NF_DROP,0,NULL);
-			} else {
-				_logger.debug("HostList: Set mark %d to packet no %d  port %hu",_config.mark_value,id,port);
-				_parent->inc_marked_hosts();
-				nfq_set_verdict2(qh,id,NF_ACCEPT,_config.mark_value,0,NULL);
+				if(_config.send_rst)
+				{
+					_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+					std::string empty_str;
+					SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+					_parent->inc_sended_rst();
+					nfq_set_verdict(qh,id,NF_DROP,0,NULL);
+				} else {
+					_logger.debug("HostList: Set mark %d to packet no %d  port %hu",_config.mark_value,id,port);
+					_parent->inc_marked_hosts();
+					nfq_set_verdict2(qh,id,NF_ACCEPT,_config.mark_value,0,NULL);
+				}
+				return ;
 			}
-			return ;
 		}
 	}
+
+
 	// nDPI usage
 	sw.reset();
 	sw.start();
@@ -231,8 +237,8 @@ void PktAnalyzer::analyzer(Packet &pkt)
 				while(nfqFilter::atm_ssl->findNext(match) && !found)
 				{
 					found=true;
-					DomainsMap::Iterator it=nfqFilter::_domainsSSLMap.find(match.id);
-					if(it != nfqFilter::_domainsSSLMap.end() && it->second != ssl_client)
+					DomainsMap::Iterator it=nfqFilter::_domainsSSLMap->find(match.id);
+					if(it != nfqFilter::_domainsSSLMap->end() && it->second != ssl_client)
 					{
 						std::size_t pos = ssl_client.find(it->second);
 						if(pos != std::string::npos)
@@ -277,7 +283,8 @@ void PktAnalyzer::analyzer(Packet &pkt)
 					u_int8_t handshake_protocol = packet_s->payload[5]; /* handshake protocol a bit misleading, it is message type according TLS specs */
 					if(handshake_protocol == 0x01 /* Client Hello */)
 					{
-						if(nfqFilter::_sslIpsSet.find(*dst_ip.get()) != nfqFilter::_sslIpsSet.end())
+						Poco::Mutex::ScopedLock lock(nfqFilter::_sslIpsSetMutex);
+						if(nfqFilter::_sslIpsSet->find(*dst_ip.get()) != nfqFilter::_sslIpsSet->end())
 						{
 							_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 							if(_config.send_rst)
@@ -334,8 +341,8 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			while(nfqFilter::atm_domains->findNext(match) && !found)
 			{
 				found=true;
-				DomainsMap::Iterator it=nfqFilter::_domainsMap.find(match.id);
-				if(it != nfqFilter::_domainsMap.end() && it->second != host)
+				DomainsMap::Iterator it=nfqFilter::_domainsMap->find(match.id);
+				if(it != nfqFilter::_domainsMap->end() && it->second != host)
 				{
 					std::size_t pos = host.find(it->second);
 					if(pos != std::string::npos)
@@ -387,8 +394,8 @@ void PktAnalyzer::analyzer(Packet &pkt)
 				while(nfqFilter::atm->findNext(match) && !found)
 				{
 					found=true;
-					DomainsMap::Iterator it=nfqFilter::_domainsUrlsMap.find(match.id);
-					if(it != nfqFilter::_domainsUrlsMap.end())
+					DomainsMap::Iterator it=nfqFilter::_domainsUrlsMap->find(match.id);
+					if(it != nfqFilter::_domainsUrlsMap->end())
 					{
 						if(_config.match_host_exactly)
 						{

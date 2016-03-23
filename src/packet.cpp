@@ -69,12 +69,5 @@ Packet::~Packet()
 		free(_ext_pkt);
 	}
 #endif
-	// если не знаем что делать с пакетом, тогда accept...
-/*	if(!_verdicted)
-	{
-		_verdicted=true;
-		_verdict=NF_ACCEPT;
-		nfq_set_verdict(_qh,_id,_verdict,0,NULL);
-	}*/
 }
 

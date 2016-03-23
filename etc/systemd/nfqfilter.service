@@ -7,6 +7,7 @@ After=network.target
 Type=forking
 ExecStart=/usr/local/bin/nfqfilter --daemon --pidfile=/var/run/nfqfilter.pid -c /usr/local/etc/nfqfilter.ini
 PIDFile=/var/run/nfqfilter.pid
+ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target
