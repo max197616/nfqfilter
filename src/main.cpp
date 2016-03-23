@@ -32,9 +32,9 @@ DomainsMap *nfqFilter::_domainsMap = new DomainsMap;
 DomainsMap *nfqFilter::_domainsUrlsMap = new DomainsMap;
 DomainsMap *nfqFilter::_domainsSSLMap = new DomainsMap;
 
-Poco::Mutex nfqFilter::_ipportMapMutex;
+Poco::RWLock nfqFilter::_ipportMapMutex;
 IPPortMap *nfqFilter::_ipportMap = new IPPortMap;
-Poco::Mutex nfqFilter::_sslIpsSetMutex;
+Poco::RWLock nfqFilter::_sslIpsSetMutex;
 SSLIps    *nfqFilter::_sslIpsSet = new SSLIps;
 
 Poco::Mutex nfqFilter::_urlMapMutex;

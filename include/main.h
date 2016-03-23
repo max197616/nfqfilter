@@ -31,6 +31,7 @@
 #include <Poco/StreamCopier.h>
 #include <Poco/HashMap.h>
 #include <Poco/ErrorHandler.h>
+#include <Poco/RWLock.h>
 #include <set>
 #include <ndpi_api.h>
 #include "sender.h"
@@ -63,10 +64,10 @@ public:
 	static DomainsMap *_domainsUrlsMap;
 	static DomainsMap *_domainsSSLMap;
 
-	static Poco::Mutex _ipportMapMutex;
+	static Poco::RWLock _ipportMapMutex;
 	static IPPortMap *_ipportMap;
 
-	static Poco::Mutex _sslIpsSetMutex;
+	static Poco::RWLock _sslIpsSetMutex;
 	static SSLIps    *_sslIpsSet;
 
 	static Poco::Mutex _urlMapMutex;

@@ -166,7 +166,7 @@ void PktAnalyzer::analyzer(Packet &pkt)
 
 
 	{
-		Poco::Mutex::ScopedLock lock(nfqFilter::_ipportMapMutex);
+		Poco::ScopedReadRWLock lock(nfqFilter::_ipportMapMutex);
 		IPPortMap::iterator it_ip=nfqFilter::_ipportMap->find(*dst_ip.get());
 		if(it_ip != nfqFilter::_ipportMap->end())
 		{
@@ -283,7 +283,7 @@ void PktAnalyzer::analyzer(Packet &pkt)
 					u_int8_t handshake_protocol = packet_s->payload[5]; /* handshake protocol a bit misleading, it is message type according TLS specs */
 					if(handshake_protocol == 0x01 /* Client Hello */)
 					{
-						Poco::Mutex::ScopedLock lock(nfqFilter::_sslIpsSetMutex);
+						Poco::ScopedReadRWLock lock(nfqFilter::_sslIpsSetMutex);
 						if(nfqFilter::_sslIpsSet->find(*dst_ip.get()) != nfqFilter::_sslIpsSet->end())
 						{
 							_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);

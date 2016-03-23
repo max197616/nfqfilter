@@ -107,7 +107,7 @@ void ReloadTask::runTask()
 				IPPortMap *old;
 				_parent->loadHosts(_parent->getHostsFile(),ip_port_map);
 				{
-					Poco::Mutex::ScopedLock lock(nfqFilter::_ipportMapMutex);
+					Poco::ScopedWriteRWLock lock(nfqFilter::_ipportMapMutex);
 					old = nfqFilter::_ipportMap;
 					nfqFilter::_ipportMap = ip_port_map;
 				}
@@ -125,7 +125,7 @@ void ReloadTask::runTask()
 				_parent->loadSSLIP(_parent->getSSLIpsFile(),ssl_ips);
 				SSLIps *ssl_ips_old;
 				{
-					Poco::Mutex::ScopedLock lock(nfqFilter::_sslIpsSetMutex);
+					Poco::ScopedWriteRWLock lock(nfqFilter::_sslIpsSetMutex);
 					ssl_ips_old = nfqFilter::_sslIpsSet;
 					nfqFilter::_sslIpsSet = ssl_ips;
 				}

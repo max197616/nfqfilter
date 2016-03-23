@@ -45,9 +45,9 @@ AC_MSG_CHECKING([for debug enabled])
 
 
 if test x"$debug" = x"true"; then
-    CXXFLAGS="$CXXFLAGS -std=c++0x -O2 -g -Wall"
+    CXXFLAGS="$CXXFLAGS -std=c++0x -O0 -g -Wall -pthread"
 else
-    CXXFLAGS="$CXXFLAGS -std=c++0x -O2"
+    CXXFLAGS="$CXXFLAGS -std=c++0x -O2 -pthread"
 fi
 
 AC_COMPILE_IFELSE([AC_LANG_SOURCE(
