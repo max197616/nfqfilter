@@ -54,6 +54,11 @@ struct threadStats
 	uint64_t redirected_urls;
 	uint64_t marked_hosts;
 	uint64_t sended_rst;
+	uint64_t ip_packets;
+	uint64_t total_bytes;
+	uint64_t matched_ssl;
+	uint64_t matched_ssl_ip;
+	uint64_t matched_ip_port;
 };
 
 class nfqThread: public Poco::Task
@@ -94,6 +99,42 @@ public:
 		_stats.sended_rst++;
 	}
 
+	void inc_ip_packets()
+	{
+		Poco::Mutex::ScopedLock lock(_statsMutex);
+		_stats.ip_packets++;
+	}
+
+	void inc_total_bytes(uint32_t bytes)
+	{
+		Poco::Mutex::ScopedLock lock(_statsMutex);
+		_stats.total_bytes += bytes;
+	}
+
+	void inc_total_bytes_packets(uint32_t bytes)
+	{
+		Poco::Mutex::ScopedLock lock(_statsMutex);
+		_stats.total_bytes += bytes;
+		_stats.ip_packets++;
+	}
+
+	void inc_matched_ssl()
+	{
+		Poco::Mutex::ScopedLock lock(_statsMutex);
+		_stats.matched_ssl++;
+	}
+
+	void inc_matched_ssl_ip()
+	{
+		Poco::Mutex::ScopedLock lock(_statsMutex);
+		_stats.matched_ssl_ip++;
+	}
+
+	void inc_matched_ip_port()
+	{
+		Poco::Mutex::ScopedLock lock(_statsMutex);
+		_stats.matched_ip_port++;
+	}
 private:
 	Poco::Logger& _logger;
 	struct nfq_q_handle *qh;

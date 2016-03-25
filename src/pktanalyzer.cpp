@@ -142,6 +142,8 @@ void PktAnalyzer::analyzer(Packet &pkt)
 	// общая длина всех заголовков
 	uint32_t hlen = iphlen + tcphlen;
 
+	_parent->inc_total_bytes_packets(size);
+
 	// пропускаем пакет без данных
 	if(hlen == size)
 	{
@@ -173,6 +175,7 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			unsigned short port=tcp_dst_port;
 			if (it_ip->second.size() == 0 || it_ip->second.find(port) != it_ip->second.end())
 			{
+				_parent->inc_matched_ip_port();
 				if(_config.send_rst)
 				{
 					_logger.debug("HostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
@@ -257,6 +260,7 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			_logger.debug("SSL Host seek occupied %ld us, host: %s",sw.elapsed(),ssl_client);
 			if(found)
 			{
+				_parent->inc_matched_ssl();
 				if(_config.send_rst)
 				{
 					_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
@@ -286,6 +290,7 @@ void PktAnalyzer::analyzer(Packet &pkt)
 						Poco::ScopedReadRWLock lock(nfqFilter::_sslIpsSetMutex);
 						if(nfqFilter::_sslIpsSet->find(*dst_ip.get()) != nfqFilter::_sslIpsSet->end())
 						{
+							_parent->inc_matched_ssl_ip();
 							_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 							if(_config.send_rst)
 							{
