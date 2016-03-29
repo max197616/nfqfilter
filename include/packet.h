@@ -16,11 +16,55 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *
 */
-#ifndef __QDPI_H
-#define __QDPI_H
 
-#include <ndpi_api.h>
+#ifndef __PACKET_H
+#define __PACKET_H
 
-struct ndpi_detection_module_struct* init_ndpi();
+#include <stdint.h>
+#include <sys/time.h>
+
+#define DYNAMIC_MEM
+
+class Packet
+{
+public:
+	Packet(struct nfq_q_handle *qh, int packet_id, struct nfq_data *nfa);
+	~Packet();
+	inline int get_id()
+	{
+		return _id;
+	}
+	inline uint8_t *get_payload()
+	{
+#ifdef DYNAMIC_MEM
+		return _ext_pkt;
+#else
+		return &_ext_pkt[0];
+#endif
+	}
+	inline uint32_t get_size()
+	{
+		return _pktlen;
+	}
+	inline struct nfq_q_handle *get_qh()
+	{
+		return _qh;
+	}
+private:
+
+	struct nfq_q_handle *_qh;
+
+	int _id; /* номер пакета в nfq*/
+
+	uint32_t _pktlen;
+
+#ifdef DYNAMIC_MEM
+	uint8_t *_ext_pkt;
+#else
+	uint8_t _ext_pkt[2000];
+#endif
+
+	struct timeval _ts;
+};
 
 #endif

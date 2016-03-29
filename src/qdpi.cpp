@@ -80,11 +80,15 @@ struct ndpi_detection_module_struct* init_ndpi()
 		return NULL;
 	}
 
-	my_ndpi_struct->http_dont_dissect_response=1; // не ждем ответа http для разбора!!!
+//	my_ndpi_struct->http_dont_dissect_response=1;
 
 	NDPI_PROTOCOL_BITMASK all;
+
+	NDPI_BITMASK_ADD(all,NDPI_PROTOCOL_HTTP);
+	NDPI_BITMASK_ADD(all,NDPI_PROTOCOL_SSL);
+
 	// enable all protocols
-	NDPI_BITMASK_SET_ALL(all);
+//	NDPI_BITMASK_SET_ALL(all);
 	ndpi_set_protocol_detection_bitmask2(my_ndpi_struct, &all);
 
 	return my_ndpi_struct;

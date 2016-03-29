@@ -31,8 +31,9 @@
 #include <Poco/StreamCopier.h>
 #include <Poco/HashMap.h>
 #include <Poco/ErrorHandler.h>
+#include <Poco/RWLock.h>
 #include <set>
-#include <libndpi/ndpi_api.h>
+#include <ndpi_api.h>
 #include "sender.h"
 #include "nfqthread.h"
 
@@ -45,7 +46,9 @@
 typedef Poco::HashMap<unsigned int, std::string> DomainsMap;
 typedef Poco::HashMap<std::string,int> UrlsMap;
 
-typedef Poco::HashMap<int,std::set<unsigned short>> IPPortMap;
+typedef std::map<Poco::Net::IPAddress,std::set<unsigned short>> IPPortMap;
+
+typedef std::set<Poco::Net::IPAddress> SSLIps;
 
 class AhoCorasickPlus;
 
@@ -57,11 +60,15 @@ public:
 	~nfqFilter();
 
 	static Poco::Mutex _domainMapMutex;
-	static DomainsMap _domainsMap;
-	static DomainsMap _domainsUrlsMap;
-	static DomainsMap _domainsSSLMap;
+	static DomainsMap *_domainsMap;
+	static DomainsMap *_domainsUrlsMap;
+	static DomainsMap *_domainsSSLMap;
 
-	static IPPortMap _ipportMap;
+	static Poco::RWLock _ipportMapMutex;
+	static IPPortMap *_ipportMap;
+
+	static Poco::RWLock _sslIpsSetMutex;
+	static SSLIps    *_sslIpsSet;
 
 	static Poco::Mutex _urlMapMutex;
 
@@ -77,6 +84,35 @@ public:
 	static AhoCorasickPlus *atm_ssl;
 	static AhoCorasickPlus *atm_domains;
 
+	std::string &getSSLFile()
+	{
+		return _sslFile;
+	}
+
+	std::string &getDomainsFile()
+	{
+		return _domainsFile;
+	}
+
+	std::string &getURLsFile()
+	{
+		return _urlsFile;
+	}
+
+	std::string &getHostsFile()
+	{
+	    return _hostsFile;
+	}
+
+	std::string &getSSLIpsFile()
+	{
+		return _sslIpsFile;
+	}
+
+	void loadDomains(std::string &fn, AhoCorasickPlus *_dm_atm,DomainsMap *_dm_map);
+	void loadURLs(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap *dm_map);
+	void loadHosts(std::string &fn,IPPortMap *ippm);
+	void loadSSLIP(std::string &fn, SSLIps *sslips);
 protected:
 	class ErrorHandler: public Poco::ErrorHandler
 	{
@@ -108,7 +144,7 @@ protected:
 	void initialize(Application& self);
 	void uninitialize();
 	void defineOptions(Poco::Util::OptionSet& options);
-	void handleOptions(const std::string& name,const std::string& value);
+	void handleOption(const std::string& name,const std::string& value);
 	void handleHelp(const std::string& name,const std::string& value);
 	void displayHelp();
 	int main(const ArgVec& args);
@@ -119,8 +155,14 @@ private:
 	std::string _domainsFile;
 	std::string _urlsFile;
 	std::string _protocolsFile;
+	std::string _sslFile;
+	std::string _hostsFile;
+	std::string _sslIpsFile;
 	int _statistic_interval;
 	struct nfqConfig _config;
+
+	int _cmd_queueNum;
+	int _cmd_threadsNum;
 
 	ErrorHandler _errorHandler;
 	struct CSender::params _sender_params;
