@@ -280,33 +280,26 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			}
 		} else {
 			struct ndpi_packet_struct *packet_s = &flow->packet;
-			if(_config.block_undetected_ssl && flow->l4.tcp.ssl_stage >= 1)
+			if(_config.block_undetected_ssl)
 			{
-				if(packet_s->payload[0] == 0x16 /* Handshake */)
+				Poco::ScopedReadRWLock lock(nfqFilter::_sslIpsSetMutex);
+				if(nfqFilter::_sslIpsSet->find(*dst_ip.get()) != nfqFilter::_sslIpsSet->end())
 				{
-					u_int8_t handshake_protocol = packet_s->payload[5]; /* handshake protocol a bit misleading, it is message type according TLS specs */
-					if(handshake_protocol == 0x01 /* Client Hello */)
+					_parent->inc_matched_ssl_ip();
+					_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
+					if(_config.send_rst)
 					{
-						Poco::ScopedReadRWLock lock(nfqFilter::_sslIpsSetMutex);
-						if(nfqFilter::_sslIpsSet->find(*dst_ip.get()) != nfqFilter::_sslIpsSet->end())
-						{
-							_parent->inc_matched_ssl_ip();
-							_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
-							if(_config.send_rst)
-							{
-								_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
-								std::string empty_str;
-								SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
-								_parent->inc_sended_rst();
-								nfq_set_verdict(qh,id,NF_DROP,0,NULL);
-							} else {
-								_logger.debug("SSLClientHello: Set mark %d to packet no %d",_config.mark_value,id);
-								_parent->inc_marked_ssl();
-								nfq_set_verdict2(qh,id,NF_ACCEPT,_config.mark_value,0,NULL);
-							}
-							return ;
-						}
+						_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+						std::string empty_str;
+						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+						_parent->inc_sended_rst();
+						nfq_set_verdict(qh,id,NF_DROP,0,NULL);
+					} else {
+						_logger.debug("SSLClientHello: Set mark %d to packet no %d",_config.mark_value,id);
+						_parent->inc_marked_ssl();
+						nfq_set_verdict2(qh,id,NF_ACCEPT,_config.mark_value,0,NULL);
 					}
+					return ;
 				}
 			}
 			_logger.debug("No ssl client certificate found! Accept packet from %s:%d to %s:%d.",src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
