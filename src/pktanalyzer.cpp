@@ -40,6 +40,7 @@
 #define iphdr(x)	((struct iphdr *)(x))
 #define tcphdr(x)	((struct tcphdr *)(x))
 
+#define __USE_POCO_URI_DECODE
 
 PktAnalyzer::PktAnalyzer(const std::string& name, Poco::NotificationQueue& queue, struct nfqConfig& cfg, nfqThread *parent):
 	_name(name),
@@ -381,15 +382,31 @@ void PktAnalyzer::analyzer(Packet &pkt)
 		std::string uri_o(flow->http.url ? flow->http.url : "");
 		if(flow->http.url)
 		{
+			std::string uri;
 			if(dot_del)
 				uri_o.erase(dot_del,1);
-			uri_o.insert(0,"http://");
-			Poco::URI uri_p(uri_o);
-			uri_p.normalize();
-			std::string uri(uri_p.toString());
-			uri.erase(0,7);
-			if(_config.url_decode)
-				uri=url_decode(uri);
+			try
+			{
+				uri_o.insert(0,"http://");
+				Poco::URI uri_p(uri_o);
+				uri_p.normalize();
+				uri.assign(uri_p.toString());
+				uri.erase(0,7);
+				if(_config.url_decode)
+				{
+#ifdef __USE_POCO_URI_DECODE
+					std::string decoded;
+					Poco::URI::decode(uri,decoded);
+#else
+					uri=url_decode(uri);
+#endif
+				}
+			} catch (Poco::SyntaxException &ex)
+			{
+				_logger.debug("An SyntaxException occured: '%s' on URI: '%s'",ex.displayText(), uri_o);
+				uri.assign(flow->http.url);
+			}
+
 			{
 				Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 				nfqFilter::atm->search(uri,false);
