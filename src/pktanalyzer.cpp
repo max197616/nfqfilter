@@ -31,6 +31,7 @@
 
 #include <Poco/Stopwatch.h>
 #include <Poco/Net/IPAddress.h>
+#include <Poco/URI.h>
 
 #include "sendertask.h"
 #include "ndpiwrapper.h"
@@ -377,13 +378,16 @@ void PktAnalyzer::analyzer(Packet &pkt)
 		sw.reset();
 		sw.start();
 		found=false;
-		std::string uri(flow->http.url ? flow->http.url : "");
+		std::string uri_o(flow->http.url ? flow->http.url : "");
 		if(flow->http.url)
 		{
 			if(dot_del)
-				uri.erase(dot_del,1);
-			if(_config.lower_host)
-				uri.replace(0,host.length(),host);
+				uri_o.erase(dot_del,1);
+			uri_o.insert(0,"http://");
+			Poco::URI uri_p(uri_o);
+			uri_p.normalize();
+			std::string uri(uri_p.toString());
+			uri.erase(0,7);
 			if(_config.url_decode)
 				uri=url_decode(uri);
 			{
