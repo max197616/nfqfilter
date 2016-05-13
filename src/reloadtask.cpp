@@ -85,7 +85,7 @@ void ReloadTask::runTask()
 				_parent->loadURLs(_parent->getURLsFile(),atm_new,dm_new);
 				atm_new->finalize();
 				{
-					Poco::Mutex::ScopedLock lock(nfqFilter::_domainMapMutex);
+					Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 					to_del_atm = nfqFilter::atm;
 					to_del_dm = nfqFilter::_domainsUrlsMap;
 					nfqFilter::atm = atm_new;
