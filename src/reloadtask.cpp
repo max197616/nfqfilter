@@ -119,15 +119,15 @@ void ReloadTask::runTask()
 				delete ip_port_map;
 			}
 
-			SSLIps *ssl_ips = new SSLIps;
+			IPAcl *ssl_ips = new IPAcl;
 			try
 			{
 				_parent->loadSSLIP(_parent->getSSLIpsFile(),ssl_ips);
-				SSLIps *ssl_ips_old;
+				IPAcl *ssl_ips_old;
 				{
 					Poco::ScopedWriteRWLock lock(nfqFilter::_sslIpsSetMutex);
-					ssl_ips_old = nfqFilter::_sslIpsSet;
-					nfqFilter::_sslIpsSet = ssl_ips;
+					ssl_ips_old = nfqFilter::_sslIps;
+					nfqFilter::_sslIps = ssl_ips;
 				}
 				delete ssl_ips_old;
 				_logger.information("Reloaded data for ssl ip list");

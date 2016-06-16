@@ -35,7 +35,7 @@ DomainsMap *nfqFilter::_domainsSSLMap = new DomainsMap;
 Poco::RWLock nfqFilter::_ipportMapMutex;
 IPPortMap *nfqFilter::_ipportMap = new IPPortMap;
 Poco::RWLock nfqFilter::_sslIpsSetMutex;
-SSLIps    *nfqFilter::_sslIpsSet = new SSLIps;
+IPAcl *nfqFilter::_sslIps = new IPAcl;
 
 Poco::Mutex nfqFilter::_urlMapMutex;
 
@@ -156,7 +156,7 @@ void nfqFilter::initialize(Application& self)
 		loadHosts(_hostsFile,_ipportMap);
 
 	if(!_sslIpsFile.empty())
-		loadSSLIP(_sslIpsFile,_sslIpsSet);
+		loadSSLIP(_sslIpsFile,_sslIps);
 
 	my_ndpi_struct = init_ndpi();
 
@@ -407,7 +407,7 @@ void nfqFilter::loadHosts(std::string &fn,IPPortMap *ippm)
 	hf.close();
 }
 
-void nfqFilter::loadSSLIP(std::string &fn, SSLIps *sslips)
+void nfqFilter::loadSSLIP(std::string &fn, IPAcl *sslips)
 {
 	Poco::FileInputStream hf(fn);
 	if(hf.good())
@@ -419,12 +419,9 @@ void nfqFilter::loadSSLIP(std::string &fn, SSLIps *sslips)
 			getline(hf,str);
 			if(!str.empty())
 			{
-				std::pair<SSLIps::iterator,bool> ret;
-				Poco::Net::IPAddress ip_addr(str);
-				ret=sslips->insert(ip_addr);
-				if(ret.second == false)
+				if(!sslips->add(str))
 				{
-					logger().information("IP address %s already present at ssl ips list", ip_addr.toString());
+					logger().information("Unable to add IP address %s from line %d to the SSL IPs list", str, lineno);
 				}
 			}
 			lineno++;
