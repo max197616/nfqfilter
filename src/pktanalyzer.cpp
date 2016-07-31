@@ -285,7 +285,7 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			if(_config.block_undetected_ssl)
 			{
 				Poco::ScopedReadRWLock lock(nfqFilter::_sslIpsSetMutex);
-				if(nfqFilter::_sslIps->find(*dst_ip.get()))
+				if(nfqFilter::_sslIps->try_search_exact_ip(*dst_ip.get()))
 				{
 					_parent->inc_matched_ssl_ip();
 					_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);

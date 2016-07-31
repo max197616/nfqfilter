@@ -114,11 +114,11 @@ void ReloadTask::runTask()
 				delete ip_port_map;
 			}
 
-			IPAcl *ssl_ips = new IPAcl;
+			Patricia *ssl_ips = new Patricia;
 			try
 			{
 				_parent->loadSSLIP(_parent->getSSLIpsFile(),ssl_ips);
-				IPAcl *ssl_ips_old;
+				Patricia *ssl_ips_old;
 				{
 					Poco::ScopedWriteRWLock lock(nfqFilter::_sslIpsSetMutex);
 					ssl_ips_old = nfqFilter::_sslIps;

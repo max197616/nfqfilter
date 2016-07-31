@@ -36,7 +36,7 @@
 #include <ndpi_api.h>
 #include "sender.h"
 #include "nfqthread.h"
-#include "ipacl.h"
+#include "patr.h"
 
 /* Max packets processed simultaniously per thread. */
 #define DEFAULT_MAX_PENDING_PACKETS 1024
@@ -66,7 +66,7 @@ public:
 	static IPPortMap *_ipportMap;
 
 	static Poco::RWLock _sslIpsSetMutex;
-	static IPAcl *_sslIps;
+	static Patricia *_sslIps;
 
 	static Poco::Mutex _urlMapMutex;
 
@@ -110,7 +110,7 @@ public:
 	void loadDomains(std::string &fn, AhoCorasickPlus *_dm_atm,DomainsMap *_dm_map);
 	void loadURLs(std::string &fn, AhoCorasickPlus *dm_atm);
 	void loadHosts(std::string &fn,IPPortMap *ippm);
-	void loadSSLIP(std::string &fn, IPAcl *sslips);
+	void loadSSLIP(const std::string &fn, Patricia *patricia);
 protected:
 	class ErrorHandler: public Poco::ErrorHandler
 	{

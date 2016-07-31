@@ -17,36 +17,27 @@
 *
 */
 
-#ifndef __IPACL_H
-#define __IPACL_H
+#ifndef __PATR_H
+#define __PATR_H
 
 #include <Poco/Net/IPAddress.h>
 #include <string>
-#include <vector>
+#include "patricia.h"
 
-class IPAclEntry
+class Patricia
 {
 public:
-	IPAclEntry(Poco::Net::IPAddress &addr, Poco::Net::IPAddress &msk);
-	IPAclEntry(const std::string &description);
-	bool parse(const std::string &description);
-	bool match(Poco::Net::IPAddress &addr);
-	bool isValid();
-	std::string toString();
+	Patricia();
+	~Patricia();
 
-	Poco::Net::IPAddress address;
-	Poco::Net::IPAddress mask;
+	patricia_node_t *make_and_lookup(std::string &addr);
+	/// Поиск только по адресу
+	patricia_node_t *try_search_exact_ip(Poco::Net::IPAddress &address);
+	void print_all_nodes();
+private:
+	bool fill_prefix(int family, void *dest, int bitlen, prefix_t &prefix);
+	patricia_tree_t *tree_ipv4;
+	patricia_tree_t *tree_ipv6;
 };
-
-class IPAcl
-{
-public:
-	IPAcl();
-	IPAclEntry *find(Poco::Net::IPAddress &addr);
-	bool add(const std::string &description);
-
-	std::vector<IPAclEntry> acl;
-};
-
 
 #endif

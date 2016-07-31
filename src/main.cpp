@@ -35,7 +35,7 @@ DomainsMap *nfqFilter::_domainsSSLMap = new DomainsMap;
 Poco::RWLock nfqFilter::_ipportMapMutex;
 IPPortMap *nfqFilter::_ipportMap = new IPPortMap;
 Poco::RWLock nfqFilter::_sslIpsSetMutex;
-IPAcl *nfqFilter::_sslIps = new IPAcl;
+Patricia *nfqFilter::_sslIps = new Patricia;
 
 Poco::Mutex nfqFilter::_urlMapMutex;
 
@@ -397,7 +397,7 @@ void nfqFilter::loadHosts(std::string &fn,IPPortMap *ippm)
 	hf.close();
 }
 
-void nfqFilter::loadSSLIP(std::string &fn, IPAcl *sslips)
+void nfqFilter::loadSSLIP(const std::string &fn, Patricia *patricia)
 {
 	Poco::FileInputStream hf(fn);
 	if(hf.good())
@@ -409,7 +409,7 @@ void nfqFilter::loadSSLIP(std::string &fn, IPAcl *sslips)
 			getline(hf,str);
 			if(!str.empty())
 			{
-				if(!sslips->add(str))
+				if(!patricia->make_and_lookup(str))
 				{
 					logger().information("Unable to add IP address %s from line %d to the SSL IPs list", str, lineno);
 				}
