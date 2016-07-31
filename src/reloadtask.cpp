@@ -79,26 +79,21 @@ void ReloadTask::runTask()
 			}
 
 			atm_new = new AhoCorasickPlus();
-			dm_new = new DomainsMap;
 			try
 			{
-				_parent->loadURLs(_parent->getURLsFile(),atm_new,dm_new);
+				_parent->loadURLs(_parent->getURLsFile(),atm_new);
 				atm_new->finalize();
 				{
 					Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 					to_del_atm = nfqFilter::atm;
-					to_del_dm = nfqFilter::_domainsUrlsMap;
 					nfqFilter::atm = atm_new;
-					nfqFilter::_domainsUrlsMap = dm_new;
 				}
 				delete to_del_atm;
-				delete to_del_dm;
 				_logger.information("Reloaded data for urls list");
 			} catch (Poco::Exception &excep)
 			{
 				_logger.error("Got exception while reload urls data: %s:%s",excep.message(),excep.what());
 				delete atm_new;
-				delete dm_new;
 			}
 
 			IPPortMap *ip_port_map = new IPPortMap;

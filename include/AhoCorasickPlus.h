@@ -28,6 +28,7 @@ using std::string;
 #include <queue>
 using std::queue;
 
+#include "actypes.h"
 
 // forward declaration
 struct AC_AUTOMATA;
@@ -54,6 +55,7 @@ public:
     {
         unsigned int    position;
         PatternId       id;
+	AC_PATTERN_t	pattern;
     };
 
 public:

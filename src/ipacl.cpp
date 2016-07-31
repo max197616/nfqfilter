@@ -84,6 +84,16 @@ bool IPAclEntry::match(Poco::Net::IPAddress &addr)
 		return false;
 	if(address.family() == Poco::Net::IPAddress::IPv4)
 		return (address & mask) == (addr & mask);
+#ifdef _COMPARE_IPV6_NEW_
+	struct in6_addr masked = *((struct in6_addr *)addr.addr());
+	struct in6_addr *mask_s = (struct in6_addr *)mask.addr();
+
+	masked.s6_addr32[0] &= mask_s->s6_addr32[0];
+	masked.s6_addr32[1] &= mask_s->s6_addr32[1];
+	masked.s6_addr32[2] &= mask_s->s6_addr32[2];
+	masked.s6_addr32[3] &= mask_s->s6_addr32[3];
+	return memcmp(address.addr(),&masked,sizeof(struct in6_addr)) == 0;
+#else
 	int pflen=mask.prefixLength();
 	uint32_t oct,bit;
 	for(int i=0; i < pflen; i++)
@@ -96,6 +106,7 @@ bool IPAclEntry::match(Poco::Net::IPAddress &addr)
 		}
 	}
 	return true;
+#endif
 }
 
 bool IPAclEntry::isValid()

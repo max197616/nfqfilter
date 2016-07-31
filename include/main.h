@@ -60,7 +60,6 @@ public:
 
 	static Poco::Mutex _domainMapMutex;
 	static DomainsMap *_domainsMap;
-	static DomainsMap *_domainsUrlsMap;
 	static DomainsMap *_domainsSSLMap;
 
 	static Poco::RWLock _ipportMapMutex;
@@ -109,7 +108,7 @@ public:
 	}
 
 	void loadDomains(std::string &fn, AhoCorasickPlus *_dm_atm,DomainsMap *_dm_map);
-	void loadURLs(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap *dm_map);
+	void loadURLs(std::string &fn, AhoCorasickPlus *dm_atm);
 	void loadHosts(std::string &fn,IPPortMap *ippm);
 	void loadSSLIP(std::string &fn, IPAcl *sslips);
 protected:

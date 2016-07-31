@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <Poco/NumberParser.h>
+#include <Poco/URI.h>
 #include "main.h"
 #include "nfqstatistictask.h"
 #include "qdpi.h"
@@ -29,7 +30,6 @@
 
 Poco::Mutex nfqFilter::_domainMapMutex;
 DomainsMap *nfqFilter::_domainsMap = new DomainsMap;
-DomainsMap *nfqFilter::_domainsUrlsMap = new DomainsMap;
 DomainsMap *nfqFilter::_domainsSSLMap = new DomainsMap;
 
 Poco::RWLock nfqFilter::_ipportMapMutex;
@@ -147,7 +147,7 @@ void nfqFilter::initialize(Application& self)
 	atm_ssl->finalize();
 
 	atm=new AhoCorasickPlus();
-	loadURLs(_urlsFile,atm,_domainsUrlsMap);
+	loadURLs(_urlsFile,atm);
 	atm->finalize();
 
 
@@ -310,7 +310,7 @@ void nfqFilter::loadDomains(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap 
 	df.close();
 }
 
-void nfqFilter::loadURLs(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap *dm_map)
+void nfqFilter::loadURLs(std::string &fn, AhoCorasickPlus *dm_atm)
 {
 	Poco::FileInputStream uf(fn);
 	if(uf.good())
@@ -324,30 +324,20 @@ void nfqFilter::loadURLs(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap *dm
 			{
 				AhoCorasickPlus::EnumReturnStatus status;
 				AhoCorasickPlus::PatternId patId = lineno;
-				status = dm_atm->addPattern(str, patId);
+				std::string url = str;
+				std::size_t http_pos = url.find("http://");
+				if(http_pos == std::string::npos)
+				{
+					url.insert(0,"http://");
+				}
+				status = dm_atm->addPattern(url, patId);
 				if (status!=AhoCorasickPlus::RETURNSTATUS_SUCCESS)
 				{
 					if(status == AhoCorasickPlus::RETURNSTATUS_DUPLICATE_PATTERN)
 					{
-						logger().warning("Pattern '%s' already present database from file %s",str,fn);
+						logger().warning("Pattern '%s' already present in the URL database from file %s",str,fn);
 					} else {
 						logger().error("Failed to add '%s' from line %d from file %s",str,lineno,fn);
-					}
-				} else {
-					std::size_t pos = str.find("/");
-					if(pos != std::string::npos)
-					{
-						std::string host = str.substr(0,pos);
-						std::pair<DomainsMap::Iterator,bool> res=dm_map->insert(DomainsMap::ValueType(lineno,host));
-						if(res.second)
-						{
-							logger().debug("Inserted domain: '%s' from line %d from file %s",str,lineno,fn);
-						} else {
-							logger().debug("Updated domain: '%s' from line %d from file %s",str,lineno,fn);
-						}
-					} else {
-						logger().fatal("Bad url format in line %d in file %s",lineno,fn);
-						throw Poco::Exception("Bad url format");
 					}
 				}
 			}

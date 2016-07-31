@@ -309,7 +309,7 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			return ;
 		}
 	}
-	if(protocol.master_protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_HTTP)
+	if(protocol.master_protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_DIRECT_DOWNLOAD_LINK)
 	{
 		_logger.debug("Not http protocol. Protocol is %hu/%hu from %s:%d to %s:%d",protocol.master_protocol,protocol.protocol,src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 		nfq_set_verdict(qh,id,NF_ACCEPT,0,NULL);
@@ -337,7 +337,6 @@ void PktAnalyzer::analyzer(Packet &pkt)
 		{
 			Poco::Mutex::ScopedLock lock(nfqFilter::_domainMapMutex);
 			nfqFilter::atm_domains->search(host,false);
-
 			while(nfqFilter::atm_domains->findNext(match) && !found)
 			{
 				found=true;
@@ -384,19 +383,16 @@ void PktAnalyzer::analyzer(Packet &pkt)
 		{
 			std::string uri;
 			if(dot_del)
-				uri_o.erase(dot_del,1);
+				uri_o.erase(dot_del+7,1);
 			try
 			{
-				uri_o.insert(0,"http://");
 				Poco::URI uri_p(uri_o);
 				uri_p.normalize();
 				uri.assign(uri_p.toString());
-				uri.erase(0,7);
 				if(_config.url_decode)
 				{
 #ifdef __USE_POCO_URI_DECODE
-					std::string decoded;
-					Poco::URI::decode(uri,decoded);
+					Poco::URI::decode(uri_p.toString(),uri);
 #else
 					uri=url_decode(uri);
 #endif
@@ -410,33 +406,8 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			{
 				Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 				nfqFilter::atm->search(uri,false);
-				while(nfqFilter::atm->findNext(match) && !found)
-				{
+				if(nfqFilter::atm->findNext(match))
 					found=true;
-					DomainsMap::Iterator it=nfqFilter::_domainsUrlsMap->find(match.id);
-					if(it != nfqFilter::_domainsUrlsMap->end())
-					{
-						if(_config.match_host_exactly)
-						{
-							if(it->second != host)
-								found = false;
-						} else {
-							if(it->second != host)
-							{
-								std::size_t pos = host.find(it->second);
-								if(pos != std::string::npos)
-								{
-									std::string str1 = host.substr(0,pos);
-									// это не тот домен, который нужен
-									if(str1[str1.size()-1] != '.')
-										found = false;
-								} else {
-									found = false;
-								}
-							}
-						}
-					}
-				}
 			}
 			sw.stop();
 			_logger.debug("URL seek occupied %ld us for uri %s",sw.elapsed(),uri);
