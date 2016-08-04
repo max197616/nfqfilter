@@ -1,5 +1,4 @@
+# в данном случае будет заблокирован только этот хост
 sex-money.ru
-play-gmslots.com
-aurelik.com
-vulkanplay.com
-dudu.com
+# будет заблокирован домен play-gmslots.com и все его поддомены
+*.play-gmslots.com
