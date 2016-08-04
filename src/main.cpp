@@ -29,8 +29,8 @@
 #include "reloadtask.h"
 
 Poco::Mutex nfqFilter::_domainMapMutex;
-DomainsMap *nfqFilter::_domainsMap = new DomainsMap;
-DomainsMap *nfqFilter::_domainsSSLMap = new DomainsMap;
+DomainsMatchType *nfqFilter::_domainsMatchType = new DomainsMatchType;
+DomainsMatchType *nfqFilter::_SSLdomainsMatchType = new DomainsMatchType;
 
 Poco::RWLock nfqFilter::_ipportMapMutex;
 IPPortMap *nfqFilter::_ipportMap = new IPPortMap;
@@ -87,7 +87,7 @@ void nfqFilter::initialize(Application& self)
 	_config.block_undetected_ssl=config().getBool("block_undetected_ssl",false);
 	_config.save_exception_dump=config().getBool("save_bad_packets",false);
 	_config.lower_host=config().getBool("lower_host",false);
-	_config.match_host_exactly=config().getBool("match_host_exactly",false);
+	_config.match_url_exactly=config().getBool("match_url_exactly",false);
 	_config.url_decode=config().getBool("url_decode",false);
 
 	if(_cmd_threadsNum > 0 && _cmd_threadsNum <= 16)
@@ -137,13 +137,13 @@ void nfqFilter::initialize(Application& self)
 	logger().information("Starting up on queue: %d",_config.queueNumber);
 
 	atm_domains=new AhoCorasickPlus();
-	loadDomains(_domainsFile,atm_domains,_domainsMap);
+	loadDomains(_domainsFile,atm_domains,_domainsMatchType);
 	atm_domains->finalize();
 
 
 	atm_ssl=new AhoCorasickPlus();
 	if(!_sslFile.empty())
-		loadDomains(_sslFile,atm_ssl,_domainsSSLMap);
+		loadDomains(_sslFile,atm_ssl,_SSLdomainsMatchType);
 	atm_ssl->finalize();
 
 	atm=new AhoCorasickPlus();
@@ -270,7 +270,7 @@ int nfqFilter::main(const ArgVec& args)
 	return Poco::Util::Application::EXIT_OK;
 }
 
-void nfqFilter::loadDomains(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap *dm_map)
+void nfqFilter::loadDomains(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMatchType *dm_map)
 {
 	Poco::FileInputStream df(fn);
 	if(df.good())
@@ -282,19 +282,29 @@ void nfqFilter::loadDomains(std::string &fn, AhoCorasickPlus *dm_atm,DomainsMap 
 			getline(df,str);
 			if(!str.empty())
 			{
+				if(str[0] == '#' || str[0] == ';')
+					continue;
 				AhoCorasickPlus::EnumReturnStatus status;
 				AhoCorasickPlus::PatternId patId = lineno;
-				status = dm_atm->addPattern(str, patId);
+				std::size_t pos = str.find("*.");
+				bool exact_match=true;
+				std::string insert=str;
+				if(pos != std::string::npos)
+				{
+					exact_match=false;
+					insert=str.substr(pos+2,str.length()-2);
+				}
+				status = dm_atm->addPattern(insert, patId);
 				if (status!=AhoCorasickPlus::RETURNSTATUS_SUCCESS)
 				{
 					if(status == AhoCorasickPlus::RETURNSTATUS_DUPLICATE_PATTERN)
 					{
-						logger().warning("Pattern '%s' already present database from file %s",str,fn);
+						logger().warning("Pattern '%s' already present database from file %s",insert,fn);
 					} else {
-						logger().error("Failed to add '%s' from line %d from file %s",str,lineno,fn);
+						logger().error("Failed to add '%s' from line %d from file %s",insert,lineno,fn);
 					}
 				} else {
-					std::pair<DomainsMap::Iterator,bool> res=dm_map->insert(DomainsMap::ValueType(lineno,str));
+					std::pair<DomainsMatchType::Iterator,bool> res=dm_map->insert(DomainsMatchType::ValueType(lineno,exact_match));
 					if(res.second)
 					{
 						logger().debug("Inserted domain: '%s' from line %d from file %s",str,lineno,fn);
@@ -322,6 +332,8 @@ void nfqFilter::loadURLs(std::string &fn, AhoCorasickPlus *dm_atm)
 			getline(uf,str);
 			if(!str.empty())
 			{
+				if(str[0] == '#' || str[0] == ';')
+					continue;
 				AhoCorasickPlus::EnumReturnStatus status;
 				AhoCorasickPlus::PatternId patId = lineno;
 				std::string url = str;
@@ -360,6 +372,8 @@ void nfqFilter::loadHosts(std::string &fn,IPPortMap *ippm)
 			getline(hf,str);
 			if(!str.empty())
 			{
+				if(str[0] == '#' || str[0] == ';')
+					continue;
 				std::size_t found=str.find(":");
 				std::string ip=str.substr(0, found);
 				std::string port;
@@ -409,6 +423,8 @@ void nfqFilter::loadSSLIP(const std::string &fn, Patricia *patricia)
 			getline(hf,str);
 			if(!str.empty())
 			{
+				if(str[0] == '#' || str[0] == ';')
+					continue;
 				if(!patricia->make_and_lookup(str))
 				{
 					logger().information("Unable to add IP address %s from line %d to the SSL IPs list", str, lineno);

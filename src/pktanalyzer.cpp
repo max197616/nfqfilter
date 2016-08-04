@@ -235,27 +235,25 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			if(_config.lower_host)
 				std::transform(ssl_client.begin(), ssl_client.end(), ssl_client.begin(), ::tolower);
 			AhoCorasickPlus::Match match;
+			std::size_t host_len=ssl_client.length();
 			bool found=false;
 			{
 				Poco::Mutex::ScopedLock lock(nfqFilter::_sslMutex);
 				nfqFilter::atm_ssl->search(ssl_client,false);
 				while(nfqFilter::atm_ssl->findNext(match) && !found)
 				{
-					found=true;
-					DomainsMap::Iterator it=nfqFilter::_domainsSSLMap->find(match.id);
-					if(it != nfqFilter::_domainsSSLMap->end() && it->second != ssl_client)
+					if(match.pattern.length != host_len)
 					{
-						std::size_t pos = ssl_client.find(it->second);
-						if(pos != std::string::npos)
-						{
-							std::string str1 = ssl_client.substr(0,pos);
-							// это не тот домен, который нужен
-							if(str1[str1.size()-1] != '.')
-								found=false;
-						} else {
-							found=false;
-						}
+						DomainsMatchType::Iterator it=nfqFilter::_SSLdomainsMatchType->find(match.id);
+						bool exact_match=false;
+						if(it != nfqFilter::_SSLdomainsMatchType->end())
+							exact_match = it->second;
+						if(exact_match)
+							continue;
+						if(ssl_client[host_len-match.pattern.length-1] != '.')
+							continue;
 					}
+					found=true;
 				}
 			}
 			sw.stop();
@@ -337,23 +335,21 @@ void PktAnalyzer::analyzer(Packet &pkt)
 		{
 			Poco::Mutex::ScopedLock lock(nfqFilter::_domainMapMutex);
 			nfqFilter::atm_domains->search(host,false);
+			std::size_t host_len=host.length();
 			while(nfqFilter::atm_domains->findNext(match) && !found)
 			{
-				found=true;
-				DomainsMap::Iterator it=nfqFilter::_domainsMap->find(match.id);
-				if(it != nfqFilter::_domainsMap->end() && it->second != host)
+				if(match.pattern.length != host_len)
 				{
-					std::size_t pos = host.find(it->second);
-					if(pos != std::string::npos)
-					{
-						std::string str1 = host.substr(0,pos);
-						// это не тот домен, который нужен
-						if(str1[str1.size()-1] != '.')
-							found=false;
-					} else {
-						found=false;
-					}
+					DomainsMatchType::Iterator it=nfqFilter::_domainsMatchType->find(match.id);
+					bool exact_match=false;
+					if(it != nfqFilter::_domainsMatchType->end())
+						exact_match = it->second;
+					if(exact_match)
+						continue;
+					if(host[host_len-match.pattern.length-1] != '.')
+						continue;
 				}
+				found=true;
 			}
 		}
 		sw.stop();
@@ -406,8 +402,12 @@ void PktAnalyzer::analyzer(Packet &pkt)
 			{
 				Poco::Mutex::ScopedLock lock(nfqFilter::_urlMapMutex);
 				nfqFilter::atm->search(uri,false);
-				if(nfqFilter::atm->findNext(match))
+				while(nfqFilter::atm->findNext(match) && !found)
+				{
+					if(_config.match_url_exactly && uri.length() != match.pattern.length)
+						continue;
 					found=true;
+				}
 			}
 			sw.stop();
 			_logger.debug("URL seek occupied %ld us for uri %s",sw.elapsed(),uri);

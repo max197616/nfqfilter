@@ -44,7 +44,8 @@
 // каким значением маркировать пакет, чтобы потом зарезать его файерволом
 #define MARK_VALUE 17
 
-typedef Poco::HashMap<unsigned int, std::string> DomainsMap;
+typedef Poco::HashMap<unsigned int,bool> DomainsMatchType;
+
 typedef Poco::HashMap<std::string,int> UrlsMap;
 
 typedef std::map<Poco::Net::IPAddress,std::set<unsigned short>> IPPortMap;
@@ -59,8 +60,9 @@ public:
 	~nfqFilter();
 
 	static Poco::Mutex _domainMapMutex;
-	static DomainsMap *_domainsMap;
-	static DomainsMap *_domainsSSLMap;
+	static DomainsMatchType *_domainsMatchType;
+
+	static DomainsMatchType *_SSLdomainsMatchType;
 
 	static Poco::RWLock _ipportMapMutex;
 	static IPPortMap *_ipportMap;
@@ -107,7 +109,7 @@ public:
 		return _sslIpsFile;
 	}
 
-	void loadDomains(std::string &fn, AhoCorasickPlus *_dm_atm,DomainsMap *_dm_map);
+	void loadDomains(std::string &fn, AhoCorasickPlus *_dm_atm,DomainsMatchType *_dm_map);
 	void loadURLs(std::string &fn, AhoCorasickPlus *dm_atm);
 	void loadHosts(std::string &fn,IPPortMap *ippm);
 	void loadSSLIP(const std::string &fn, Patricia *patricia);

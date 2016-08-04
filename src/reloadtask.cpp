@@ -30,9 +30,9 @@ void ReloadTask::runTask()
 			_logger.information("Reloading data from files...");
 
 			AhoCorasickPlus *atm_new = new AhoCorasickPlus();
-			DomainsMap *dm_new = new DomainsMap;
+			DomainsMatchType *dm_new = new DomainsMatchType;
 			AhoCorasickPlus *to_del_atm;
-			DomainsMap *to_del_dm;
+			DomainsMatchType *to_del_dm;
 			try
 			{
 				_parent->loadDomains(_parent->getSSLFile(),atm_new,dm_new);
@@ -40,9 +40,9 @@ void ReloadTask::runTask()
 				{
 					Poco::Mutex::ScopedLock lock(nfqFilter::_sslMutex);
 					to_del_atm = nfqFilter::atm_ssl;
-					to_del_dm = nfqFilter::_domainsSSLMap;
+					to_del_dm = nfqFilter::_SSLdomainsMatchType;
 					nfqFilter::atm_ssl = atm_new;
-					nfqFilter::_domainsSSLMap = dm_new;
+					nfqFilter::_SSLdomainsMatchType = dm_new;
 				}
 				delete to_del_atm;
 				delete to_del_dm;
@@ -56,7 +56,7 @@ void ReloadTask::runTask()
 			
 
 			atm_new = new AhoCorasickPlus();
-			dm_new = new DomainsMap;
+			dm_new = new DomainsMatchType;
 			try
 			{
 				_parent->loadDomains(_parent->getDomainsFile(),atm_new,dm_new);
@@ -64,9 +64,9 @@ void ReloadTask::runTask()
 				{
 					Poco::Mutex::ScopedLock lock(nfqFilter::_domainMapMutex);
 					to_del_atm = nfqFilter::atm_domains;
-					to_del_dm = nfqFilter::_domainsMap;
+					to_del_dm = nfqFilter::_domainsMatchType;
 					nfqFilter::atm_domains = atm_new;
-					nfqFilter::_domainsMap = dm_new;
+					nfqFilter::_domainsMatchType = dm_new;
 				}
 				delete to_del_atm;
 				delete to_del_dm;
