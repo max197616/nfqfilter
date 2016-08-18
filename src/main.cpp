@@ -338,7 +338,7 @@ void nfqFilter::loadURLs(std::string &fn, AhoCorasickPlus *dm_atm)
 				AhoCorasickPlus::PatternId patId = lineno;
 				std::string url = str;
 				std::size_t http_pos = url.find("http://");
-				if(http_pos == std::string::npos)
+				if(http_pos == std::string::npos || http_pos > 0)
 				{
 					url.insert(0,"http://");
 				}
