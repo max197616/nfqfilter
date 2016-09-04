@@ -221,91 +221,93 @@ void PktAnalyzer::analyzer(Packet &pkt)
 	_logger.debug("nDPI protocol detection occupied %ld us",sw.elapsed());
 	if(protocol.master_protocol == NDPI_PROTOCOL_SSL || protocol.protocol == NDPI_PROTOCOL_SSL || protocol.protocol == NDPI_PROTOCOL_TOR)
 	{
-		std::string ssl_client;
-		_logger.debug("Analysing SSL protocol");
-		if(flow->protos.ssl.client_certificate[0] != '\0')
+		if(flow->l4.tcp.ssl_seen_client_cert == 1)
 		{
-			ssl_client=flow->protos.ssl.client_certificate;
-			_logger.debug("SSL client is: %s",ssl_client);
-		}
-		if(!ssl_client.empty())
-		{
-			sw.reset();
-			sw.start();
-			if(_config.lower_host)
-				std::transform(ssl_client.begin(), ssl_client.end(), ssl_client.begin(), ::tolower);
-			AhoCorasickPlus::Match match;
-			std::size_t host_len=ssl_client.length();
-			bool found=false;
+			std::string ssl_client;
+			_logger.debug("Analysing SSL protocol");
+			if(flow->protos.ssl.client_certificate[0] != '\0')
 			{
-				Poco::Mutex::ScopedLock lock(nfqFilter::_sslMutex);
-				nfqFilter::atm_ssl->search(ssl_client,false);
-				while(nfqFilter::atm_ssl->findNext(match) && !found)
+				ssl_client=flow->protos.ssl.client_certificate;
+				_logger.debug("SSL client is: %s",ssl_client);
+			}
+			if(!ssl_client.empty())
+			{
+				sw.reset();
+				sw.start();
+				if(_config.lower_host)
+					std::transform(ssl_client.begin(), ssl_client.end(), ssl_client.begin(), ::tolower);
+				AhoCorasickPlus::Match match;
+				std::size_t host_len=ssl_client.length();
+				bool found=false;
 				{
-					if(match.pattern.length != host_len)
+					Poco::Mutex::ScopedLock lock(nfqFilter::_sslMutex);
+					nfqFilter::atm_ssl->search(ssl_client,false);
+					while(nfqFilter::atm_ssl->findNext(match) && !found)
 					{
-						DomainsMatchType::Iterator it=nfqFilter::_SSLdomainsMatchType->find(match.id);
-						bool exact_match=false;
-						if(it != nfqFilter::_SSLdomainsMatchType->end())
-							exact_match = it->second;
-						if(exact_match)
-							continue;
-						if(ssl_client[host_len-match.pattern.length-1] != '.')
-							continue;
+						if(match.pattern.length != host_len)
+						{
+							DomainsMatchType::Iterator it=nfqFilter::_SSLdomainsMatchType->find(match.id);
+							bool exact_match=false;
+							if(it != nfqFilter::_SSLdomainsMatchType->end())
+								exact_match = it->second;
+							if(exact_match)
+								continue;
+							if(ssl_client[host_len-match.pattern.length-1] != '.')
+								continue;
+						}
+						found=true;
 					}
-					found=true;
 				}
-			}
-			sw.stop();
-			_logger.debug("SSL Host seek occupied %ld us, host: %s",sw.elapsed(),ssl_client);
-			if(found)
-			{
-				_parent->inc_matched_ssl();
-				if(_config.send_rst)
+				sw.stop();
+				_logger.debug("SSL Host seek occupied %ld us, host: %s",sw.elapsed(),ssl_client);
+				if(found)
 				{
-					_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
-					std::string empty_str;
-					SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
-					_parent->inc_sended_rst();
-					nfq_set_verdict(qh,id,NF_DROP,0,NULL);
-				} else {
-					_logger.debug("SSLHostList: Set mark %d to packet no %d, ssl host name: %s",_config.mark_value,id,ssl_client);
-					_parent->inc_marked_ssl();
-					nfq_set_verdict2(qh,id,NF_ACCEPT,_config.mark_value,0,NULL);
-				}
-				return ;
-			} else {
-				nfq_set_verdict(qh,id,NF_ACCEPT,0,NULL);
-				return ;
-			}
-		} else {
-			struct ndpi_packet_struct *packet_s = &flow->packet;
-			if(_config.block_undetected_ssl)
-			{
-				Poco::ScopedReadRWLock lock(nfqFilter::_sslIpsSetMutex);
-				if(nfqFilter::_sslIps->try_search_exact_ip(*dst_ip.get()))
-				{
-					_parent->inc_matched_ssl_ip();
-					_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
+					_parent->inc_matched_ssl();
 					if(_config.send_rst)
 					{
-						_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+						_logger.debug("SSLHostList: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
 						std::string empty_str;
 						SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
 						_parent->inc_sended_rst();
 						nfq_set_verdict(qh,id,NF_DROP,0,NULL);
 					} else {
-						_logger.debug("SSLClientHello: Set mark %d to packet no %d",_config.mark_value,id);
+						_logger.debug("SSLHostList: Set mark %d to packet no %d, ssl host name: %s",_config.mark_value,id,ssl_client);
 						_parent->inc_marked_ssl();
 						nfq_set_verdict2(qh,id,NF_ACCEPT,_config.mark_value,0,NULL);
 					}
 					return ;
+				} else {
+					nfq_set_verdict(qh,id,NF_ACCEPT,0,NULL);
+					return ;
 				}
+			} else {
+				if(_config.block_undetected_ssl)
+				{
+					Poco::ScopedReadRWLock lock(nfqFilter::_sslIpsSetMutex);
+					if(nfqFilter::_sslIps->try_search_exact_ip(*dst_ip.get()))
+					{
+						_parent->inc_matched_ssl_ip();
+						_logger.debug("Blocking/Marking SSL client hello packet from %s:%d to %s:%d", src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
+						if(_config.send_rst)
+						{
+							_logger.debug("SSLClientHello: Send RST to the client (%s) and server (%s) (packet no %d)",src_ip->toString(),dst_ip->toString(),id);
+							std::string empty_str;
+							SenderTask::queue.enqueueNotification(new RedirectNotification(tcp_src_port, tcp_dst_port,src_ip.get(), dst_ip.get(),/*acknum*/ tcph->ack_seq, /*seqnum*/ tcph->seq,/* flag psh */ (tcph->psh ? 1 : 0 ),empty_str,true));
+							_parent->inc_sended_rst();
+							nfq_set_verdict(qh,id,NF_DROP,0,NULL);
+						} else {
+							_logger.debug("SSLClientHello: Set mark %d to packet no %d",_config.mark_value,id);
+							_parent->inc_marked_ssl();
+							nfq_set_verdict2(qh,id,NF_ACCEPT,_config.mark_value,0,NULL);
+						}
+						return ;
+					}
+				}
+				_logger.debug("No ssl client certificate found! Accept packet from %s:%d to %s:%d.",src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
 			}
-			_logger.debug("No ssl client certificate found! Accept packet from %s:%d to %s:%d.",src_ip->toString(),tcp_src_port,dst_ip->toString(),tcp_dst_port);
-			nfq_set_verdict(qh,id,NF_ACCEPT,0,NULL);
-			return ;
 		}
+		nfq_set_verdict(qh,id,NF_ACCEPT,0,NULL);
+		return ;
 	}
 	if(protocol.master_protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_HTTP && protocol.protocol != NDPI_PROTOCOL_DIRECT_DOWNLOAD_LINK)
 	{
