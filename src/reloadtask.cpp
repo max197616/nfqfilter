@@ -49,7 +49,7 @@ void ReloadTask::runTask()
 				_logger.information("Reloaded data for ssl hosts list");
 			} catch (Poco::Exception &excep)
 			{
-				_logger.error("Got exception while reload ssl data: %s:%s",excep.message(),excep.what());
+				_logger.error("Got exception while reload ssl data: %s", excep.displayText());
 				delete atm_new;
 				delete dm_new;
 			}
@@ -73,7 +73,7 @@ void ReloadTask::runTask()
 				_logger.information("Reloaded data for domains list");
 			} catch (Poco::Exception &excep)
 			{
-				_logger.error("Got exception while reload domains data: %s:%s",excep.message(),excep.what());
+				_logger.error("Got exception while reload domains data: %s", excep.displayText());
 				delete atm_new;
 				delete dm_new;
 			}
@@ -92,7 +92,7 @@ void ReloadTask::runTask()
 				_logger.information("Reloaded data for urls list");
 			} catch (Poco::Exception &excep)
 			{
-				_logger.error("Got exception while reload urls data: %s:%s",excep.message(),excep.what());
+				_logger.error("Got exception while reload urls data: %s", excep.displayText());
 				delete atm_new;
 			}
 
@@ -110,7 +110,7 @@ void ReloadTask::runTask()
 				_logger.information("Reloaded data for ip port list");
 			} catch (Poco::Exception &excep)
 			{
-				_logger.error("Got exception while reload ip port data: %s:%s",excep.message(),excep.what());
+				_logger.error("Got exception while reload ip port data: %s", excep.displayText());
 				delete ip_port_map;
 			}
 
@@ -128,7 +128,7 @@ void ReloadTask::runTask()
 				_logger.information("Reloaded data for ssl ip list");
 			} catch (Poco::Exception &excep)
 			{
-				_logger.error("Got exception while reload ip ssl data: %s:%s",excep.message(),excep.what());
+				_logger.error("Got exception while reload ip ssl data: %s", excep.displayText());
 				delete ssl_ips;
 			}
 		}
