@@ -27,6 +27,8 @@
 #include "sendertask.h"
 #include "nfqthread.h"
 #include "reloadtask.h"
+#include <signal.h>
+#include <thread>
 
 Poco::Mutex nfqFilter::_domainMapMutex;
 DomainsMatchType *nfqFilter::_domainsMatchType = new DomainsMatchType;
@@ -89,12 +91,20 @@ void nfqFilter::initialize(Application& self)
 	_config.lower_host=config().getBool("lower_host",false);
 	_config.match_url_exactly=config().getBool("match_url_exactly",false);
 	_config.url_decode=config().getBool("url_decode",false);
+	unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
 
 	if(_cmd_threadsNum > 0 && _cmd_threadsNum <= 16)
 	{
 		_config.num_threads=_cmd_threadsNum;
 	} else {
-		_config.num_threads=config().getInt("num_threads",2);
+		if (concurentThreadsSupported>0) {
+		    if (concurentThreadsSupported > 16) {
+			concurentThreadsSupported=16;
+		    }
+		    _config.num_threads=config().getInt("num_threads",concurentThreadsSupported);
+		} else {
+		    _config.num_threads=config().getInt("num_threads",2);
+		}
 		if(_config.num_threads > 16)
 			_config.num_threads=16;
 	}
