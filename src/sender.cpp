@@ -71,10 +71,11 @@ CSender::~CSender()
 	::close(s6);
 }
 
-void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip_to, int port_from, int port_to, uint32_t acknum, uint32_t seqnum, std::string &dt, int f_reset, int f_psh)
+uint32_t CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip_to, int port_from, int port_to, uint32_t acknum, uint32_t seqnum, std::string &dt, int f_reset, int f_psh)
 {
 	char datagram[4096], *data, *pseudogram=NULL;
-	
+	uint32_t nextseq;
+
 	// zero out the packet buffer
 	memset(datagram, 0, sizeof(datagram));
 	
@@ -164,7 +165,7 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 		psh.placeholder = 0;
 		psh.protocol = IPPROTO_TCP;
 		psh.tcp_length = htons(sizeof(struct tcphdr) + dt.size() );
-	
+		nextseq=htonl(ntohl(tcph->seq) + dt.size()+1);
 		int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + dt.size();
 		pseudogram = (char*)calloc(1,psize);
 	
@@ -184,6 +185,7 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 		memcpy(&psh.source_address,&iph6->ip6_src,sizeof(iph6->ip6_src));
 		memcpy(&psh.dest_address,&iph6->ip6_dst,sizeof(iph6->ip6_dst));
 		psh.tcp_length = htonl(sizeof(tcphdr) + payloadlen);
+		nextseq=htonl(ntohl(tcph->seq)+sizeof(tcphdr)+payloadlen+1);
 		psh.zero = 0;
 		psh.nexthdr = iph6->ip6_nxt;
 		int psize = sizeof(ipv6_pseudo_hdr) + sizeof(struct tcphdr) + payloadlen;
@@ -203,7 +205,7 @@ void CSender::sendPacket(Poco::Net::IPAddress &ip_from, Poco::Net::IPAddress &ip
 	if(pseudogram)
 		free(pseudogram);
 
-	return;
+	return nextseq;
 }
 
 //void CSender::sendPacket(char *ip_from, char *ip_to, int port_from, int port_to, uint32_t acknum, uint32_t seqnum)
@@ -211,18 +213,18 @@ void CSender::Redirect(int user_port, int dst_port, Poco::Net::IPAddress &user_i
 {
 	// формируем дополнительные параметры
 	std::string tstr=rHeader;
+	std::string empty_str;
 	if(!additional_param.empty())
 	{
 		tstr = "HTTP/1.1 "+_parameters.code+"\r\nLocation: " + _parameters.redirect_url + additional_param + "\r\nConnection: close\r\n";
 	} else {
 		tstr=rHeader;
 	}
-	this->sendPacket( dst_ip, user_ip, dst_port, user_port, acknum, seqnum, tstr, 0, 0);
+	uint32_t next_seq = this->sendPacket( dst_ip, user_ip, dst_port, user_port, acknum, seqnum, tstr, 0, 0);
 	// And reset session with client
-//	this->sendPacket( dst_ip, user_ip, dst_port, user_port, acknum, seqnum, redirectHeader, 1, 0);
+	this->sendPacket( dst_ip, user_ip, dst_port, user_port, next_seq, seqnum, empty_str, 1, 0);
 	
 	// And reset session with server
-	std::string empty_str;
 	this->sendPacket( user_ip, dst_ip, user_port, dst_port, seqnum, acknum, empty_str, 1, f_psh );
 
 	return;
