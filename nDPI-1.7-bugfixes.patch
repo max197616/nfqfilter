@@ -1,6 +1,7 @@
-diff -ruN nDPI.orig/configure.ac nDPI/configure.ac
---- nDPI.orig/configure.ac	2016-03-09 22:13:19.098325729 +0300
-+++ nDPI/configure.ac	2016-03-09 22:13:41.017357878 +0300
+diff --git a/configure.ac b/configure.ac
+index ab32d67..b72ebd7 100644
+--- a/configure.ac
++++ b/configure.ac
 @@ -1,6 +1,7 @@
  AC_INIT([libndpi], [1.7.0])
  
@@ -9,20 +10,63 @@ diff -ruN nDPI.orig/configure.ac nDPI/configure.ac
  
  AM_INIT_AUTOMAKE([foreign subdir-objects])
  
-diff -ruN nDPI.orig/src/lib/protocols/http.c nDPI/src/lib/protocols/http.c
-diff -ruN nDPI.orig/src/lib/protocols/ssl.c nDPI/src/lib/protocols/ssl.c
---- nDPI.orig/src/lib/protocols/ssl.c	2016-03-09 22:13:19.108326199 +0300
-+++ nDPI/src/lib/protocols/ssl.c	2016-03-09 22:13:41.017357878 +0300
-@@ -263,7 +263,7 @@
+diff --git a/src/include/ndpi_typedefs.h b/src/include/ndpi_typedefs.h
+index d73768f..e9d1402 100644
+--- a/src/include/ndpi_typedefs.h
++++ b/src/include/ndpi_typedefs.h
+@@ -911,7 +911,7 @@ typedef struct ndpi_flow_struct {
+     } ntp;
+ 
+     struct {
+-      char client_certificate[48], server_certificate[48];
++      char client_certificate[128], server_certificate[128];
+     } ssl;
+   } protos;
+ 
+diff --git a/src/lib/protocols/ssl.c b/src/lib/protocols/ssl.c
+index b113bf1..f978de6 100644
+--- a/src/lib/protocols/ssl.c
++++ b/src/lib/protocols/ssl.c
+@@ -101,6 +101,7 @@ static void stripCertificateTrailer(char *buffer, int buffer_len) {
+ 
+     if((buffer[i] != '.')
+        && (buffer[i] != '-')
++       && (buffer[i] != '_')
+        && (buffer[i] != '*')
+        && (!ndpi_isalpha(buffer[i]))
+        && (!ndpi_isdigit(buffer[i]))) {
+@@ -234,7 +235,7 @@ int getSSLcertificate(struct ndpi_detection_module_struct *ndpi_struct,
+ 	      extensions_len = packet->payload[offset];
+ 
+ 	      if((extensions_len+offset) < total_len) {
+-		u_int16_t extension_offset = 1; /* Move to the first extension */
++		u_int extension_offset = 1; /* Move to the first extension */
+ 
+ 		while(extension_offset < extensions_len) {
+ 		  u_int16_t extension_id, extension_len;
+@@ -251,6 +252,12 @@ int getSSLcertificate(struct ndpi_detection_module_struct *ndpi_struct,
+ 		    u_int begin = 0,len;
+ 		    char *server_name = (char*)&packet->payload[offset+extension_offset];
+ 
++		    if(packet->payload[offset+extension_offset+2] == 0x00) // host_name
++		    {
++			
++		    	begin =+ 5;
++		    }
++
+ 		    while(begin < extension_len) {
+ 		      if((!ndpi_isprint(server_name[begin]))
+ 			 || ndpi_ispunct(server_name[begin])
+@@ -263,7 +270,7 @@ int getSSLcertificate(struct ndpi_detection_module_struct *ndpi_struct,
  		    len = (u_int)ndpi_min(extension_len-begin, buffer_len-1);
  		    strncpy(buffer, &server_name[begin], len);
  		    buffer[len] = '\0';
 -		    stripCertificateTrailer(buffer, buffer_len);
-+//		    stripCertificateTrailer(buffer, buffer_len);
++		    //stripCertificateTrailer(buffer, buffer_len);
  
  		    snprintf(flow->protos.ssl.client_certificate,
  			     sizeof(flow->protos.ssl.client_certificate), "%s", buffer);
-@@ -288,8 +288,6 @@
+@@ -288,8 +295,6 @@ int getSSLcertificate(struct ndpi_detection_module_struct *ndpi_struct,
  int sslDetectProtocolFromCertificate(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow) {
    struct ndpi_packet_struct *packet = &flow->packet;
  
@@ -31,10 +75,11 @@ diff -ruN nDPI.orig/src/lib/protocols/ssl.c nDPI/src/lib/protocols/ssl.c
    if((packet->payload_packet_len > 9)
       && (packet->payload[0] == 0x16 /* consider only specific SSL packets (handshake) */)) {
      if((packet->detected_protocol_stack[0] == NDPI_PROTOCOL_UNKNOWN)
-diff -ruN nDPI.orig/src/lib/protocols/tor.c nDPI/src/lib/protocols/tor.c
---- nDPI.orig/src/lib/protocols/tor.c	2016-03-09 22:13:19.109326246 +0300
-+++ nDPI/src/lib/protocols/tor.c	2016-03-09 22:13:41.018357925 +0300
-@@ -24,7 +24,7 @@
+diff --git a/src/lib/protocols/tor.c b/src/lib/protocols/tor.c
+index 036162b..693661c 100644
+--- a/src/lib/protocols/tor.c
++++ b/src/lib/protocols/tor.c
+@@ -24,7 +24,7 @@ int ndpi_is_ssl_tor(struct ndpi_detection_module_struct *ndpi_struct,
  
    if((certificate == NULL)
       || (strlen(certificate) < 6)
