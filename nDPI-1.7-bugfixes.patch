@@ -88,3 +88,29 @@ index 036162b..693661c 100644
      return(0);
  
    // printf("***** [SSL] %s(): %s\n", __FUNCTION__, certificate);
+diff --git a/src/lib/protocols/http.c b/src/lib/protocols/http.c
+index 583adb3..786d4ba 100644
+--- a/src/lib/protocols/http.c
++++ b/src/lib/protocols/http.c
+@@ -459,9 +459,6 @@ static void check_http_payload(struct ndpi_detection_module_struct *ndpi_struct,
+   if(NDPI_COMPARE_PROTOCOL_TO_BITMASK(ndpi_struct->detection_bitmask, NDPI_CONTENT_AVI) != 0)
+     avi_check_http_payload(ndpi_struct, flow);
+ #endif
+-#ifdef NDPI_PROTOCOL_TEAMVIEWER
+-  teamviewer_check_http_payload(ndpi_struct, flow);
+-#endif
+ 
+ }
+ 
+diff --git a/src/lib/protocols/teamviewer.c b/src/lib/protocols/teamviewer.c
+index b97f6b1..956b88f 100644
+--- a/src/lib/protocols/teamviewer.c
++++ b/src/lib/protocols/teamviewer.c
+@@ -37,6 +37,7 @@ static void ndpi_int_teamview_add_connection(struct ndpi_detection_module_struct
+ 
+ void ndpi_search_teamview(struct ndpi_detection_module_struct *ndpi_struct, struct ndpi_flow_struct *flow)
+ {
++  return;
+   struct ndpi_packet_struct *packet = &flow->packet;
+   NDPI_LOG(NDPI_PROTOCOL_TEAMVIEWER, ndpi_struct, NDPI_LOG_TRACE, "TEAMWIEWER detection...\n");
+   /*
