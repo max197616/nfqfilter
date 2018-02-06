@@ -348,8 +348,14 @@ void nfqFilter::loadURLs(std::string &fn, AhoCorasickPlus *dm_atm)
 				AhoCorasickPlus::PatternId patId = lineno;
 				std::string url = str;
 				std::size_t http_pos = url.find("http://");
-				if(http_pos == std::string::npos || http_pos > 0)
+				std::size_t https_pos = url.find("https://");
+				if((http_pos == std::string::npos || http_pos > 0) && (https_pos == std::string::npos || https_pos > 0) )
 				{
+					url.insert(0,"http://");
+				}
+				else if((http_pos == std::string::npos || http_pos > 0) && (https_pos != std::string::npos || https_pos == 0) )
+				{
+					url.erase(0,8);
 					url.insert(0,"http://");
 				}
 				status = dm_atm->addPattern(url, patId);
